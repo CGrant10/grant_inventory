@@ -2,6 +2,13 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* The `hidden` attribute is only a UA rule (`[hidden] { display: none }`), so any
+   author rule that sets `display` silently beats it. `.gate { display: grid }`
+   did exactly that: the unlock screen stayed painted at the top of the document
+   with the app pushed below it, no matter what the JavaScript set. Same trap for
+   .app, .update-bar and .icon-btn. Make `hidden` actually mean hidden. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
