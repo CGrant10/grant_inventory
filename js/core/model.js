@@ -75,8 +75,12 @@ export function nowIso() {
  * generate the same slug and one of them could never push. The suffix makes a
  * collision effectively impossible. Nobody types these; they live inside QR
  * codes, so readability only has to survive a glance at a printed label.
+ *
+ * Six characters from a 32-symbol alphabet is ~1e9 combinations. Four was not
+ * enough: 2000 draws collided four times in testing, and a collision means a
+ * write that can never reach the server.
  */
-export function slug(text, entropy = 4) {
+export function slug(text, entropy = 6) {
   const base = String(text || '')
     .toLowerCase()
     .normalize('NFKD')

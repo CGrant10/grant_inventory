@@ -1,7 +1,7 @@
 // Service worker. CACHE must be bumped in lockstep with VERSION in
 // js/core/config.js and version.txt, or phones keep serving the old build.
 
-const CACHE = 'grant-inventory-v0.6.2';
+const CACHE = 'grant-inventory-v0.7.0';
 
 // The shell. Everything needed to open the app with no network at all.
 const SHELL = [
@@ -25,6 +25,13 @@ const SHELL = [
   'js/core/updates.js',
   'js/data/base.js',
   'js/data/members.js',
+  'js/data/locations.js',
+  'js/vendor/qr.js',
+  'js/ui/qr.js',
+  'js/ui/place-form.js',
+  'js/screens/locations.js',
+  'js/screens/location.js',
+  'js/screens/labels.js',
   'js/ui/dom.js',
   'js/ui/toast.js',
   'js/ui/sheet.js',
@@ -89,7 +96,27 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Everything else: serve from cache immediately, refresh in the background.
+  // Code (JS/CSS) is network-first when online, cache only as the offline
+  // fallback. Cache-first was serving the previous build's modules for a whole
+  // page load while quietly refreshing behind them, which meant a deploy needed
+  // two reloads and a fix could appear to be missing when it wasn't. Correctness
+  // beats shaving a few milliseconds off a warm start; offline still works,
+  // because the cache is right there when the fetch fails.
+  if (/\.(?:js|css)$/.test(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
+      try {
+        const fresh = await fetch(request);
+        if (fresh.ok) cache.put(request, fresh.clone());
+        return fresh;
+      } catch {
+        return (await cache.match(request)) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  // Static assets (icons, images): cache-first, refreshed in the background.
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const hit = await cache.match(request);

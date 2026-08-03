@@ -30,6 +30,7 @@ const TITLES = {
   '/measurements': 'Measurements',
   '/projects': 'Projects',
   '/settings': 'Settings',
+  '/labels': 'QR labels',
   '/l': 'Place',
   '/item': 'Item',
 };
@@ -41,16 +42,17 @@ function defineRoutes() {
   router.define('/home-info', () => import('./screens/home-info.js'));
   router.define('/settings', () => import('./screens/settings.js'));
 
+  router.define('/locations', () => import('./screens/locations.js'));
+  router.define('/labels',    () => import('./screens/labels.js'));
+  // Scanning a bin's QR code lands here.
+  router.define('/l/:slug',   () => import('./screens/location.js'));
+
   const later = () => import('./screens/placeholder.js');
   router.define('/inventory',   async () => ({ default: (await later()).inventory }));
-  router.define('/locations',   async () => ({ default: (await later()).locations }));
   router.define('/scan',        async () => ({ default: (await later()).scan }));
   router.define('/shopping',    async () => ({ default: (await later()).shopping }));
   router.define('/measurements',async () => ({ default: (await later()).measurements }));
   router.define('/projects',    async () => ({ default: (await later()).projects }));
-
-  // Scanning a bin's QR code lands here.
-  router.define('/l/:slug',     async () => ({ default: (await later()).locations }));
   router.define('/item/:id',    async () => ({ default: (await later()).inventory }));
 }
 

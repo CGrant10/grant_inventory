@@ -29,8 +29,15 @@ function match(path) {
   return null;
 }
 
+/** The route part of the hash, with any query string removed. */
 export function path() {
-  return (location.hash || '#/home').slice(1) || '/home';
+  const raw = (location.hash || '#/home').slice(1) || '/home';
+  return raw.split('?')[0] || '/home';
+}
+
+/** Query parameters from the hash, e.g. #/labels?only=pantry-2. */
+export function query() {
+  return new URLSearchParams((location.hash.split('?')[1] || ''));
 }
 
 export function go(to, { replace = false } = {}) {

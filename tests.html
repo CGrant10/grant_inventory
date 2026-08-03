@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grant Inventory — tests</title>
+<style>
+  body { font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+         margin: 0; padding: 24px; background: #14150f; color: #eee; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 15px; margin: 24px 0 8px; color: #c9ae87; text-transform: uppercase; letter-spacing: .06em; }
+  .case { padding: 6px 10px; border-left: 3px solid #333; margin: 4px 0; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  .pass { border-color: #2fd6a4; }
+  .fail { border-color: #ff6b6b; background: #2a1616; }
+  .detail { color: #999; }
+  #summary { margin-top: 20px; padding: 12px 16px; border-radius: 10px; font-weight: 700; }
+  .ok { background: #12352c; color: #2fd6a4; }
+  .bad { background: #38201c; color: #ff6b6b; }
+  #samples { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+  #samples figure { margin: 0; text-align: center; }
+  #samples svg { width: 150px; height: 150px; background: #fff; border-radius: 6px; }
+  figcaption { font-size: 11px; color: #999; margin-top: 4px; max-width: 150px; word-break: break-all; }
+</style>
+</head>
+<body>
+<h1>Grant Inventory — tests</h1>
+<div id="out"></div>
+<div id="summary"></div>
+<h2>Rendered samples — scan these with a phone</h2>
+<div id="samples"></div>
+
+<script type="module">
+import { encode, toSvg, rsEncode, formatBits, versionBits, blockStructure } from './js/vendor/qr.js';
+import { slug } from './js/core/model.js';
+
+const out = document.getElementById('out');
+let passed = 0, failed = 0;
+
+function group(name) {
+  out.insertAdjacentHTML('beforeend', `<h2>${name}</h2>`);
+}
+function check(name, actual, expected) {
+  const a = JSON.stringify(actual), e = JSON.stringify(expected);
+  const ok = a === e;
+  ok ? passed++ : failed++;
+  out.insertAdjacentHTML('beforeend',
+    `<div class="case ${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'} — ${name}` +
+    (ok ? '' : `<div class="detail">got ${a}<br>want ${e}</div>`) + `</div>`);
+}
+function ok(name, condition, detail = '') {
+  condition ? passed++ : failed++;
+  out.insertAdjacentHTML('beforeend',
+    `<div class="case ${condition ? 'pass' : 'fail'}">${condition ? 'PASS' : 'FAIL'} — ${name}` +
+    (condition ? '' : `<div class="detail">${detail}</div>`) + `</div>`);
+}
+const hex = arr => [...arr].map(b => b.toString(16).padStart(2, '0')).join(' ');
+
+/* ---------------------------------------------------------------- Reed-Solomon
+   The worked example from the specification: version 1, level M, "01234567".
+   If the generator polynomial or the GF(256) arithmetic is wrong, this fails. */
+
+group('Reed–Solomon');
+{
+  const data = [0x10, 0x20, 0x0c, 0x56, 0x61, 0x80, 0xec, 0x11,
+                0xec, 0x11, 0xec, 0x11, 0xec, 0x11, 0xec, 0x11];
+  const want = 'a5 24 d4 c1 ed 36 c7 87 2c 55';
+  check('spec example, 10 EC codewords', hex(rsEncode(data, 10)), want);
+}
+
+/* --------------------------------------------------------- Format / version info
+   Published BCH tables. These are what a scanner reads first. */
+
+group('Format and version information');
+{
+  const M = [0x5412, 0x5125, 0x5e7c, 0x5b4b, 0x45f9, 0x40ce, 0x4f97, 0x4aa0];
+  const L = [0x77c4, 0x72f3, 0x7daa, 0x789d, 0x662f, 0x6318, 0x6c41, 0x6976];
+  const Q = [0x355f, 0x3068, 0x3f31, 0x3a06, 0x24b4, 0x2183, 0x2eda, 0x2bed];
+  const H = [0x1689, 0x13be, 0x1ce7, 0x19d0, 0x0762, 0x0255, 0x0d0c, 0x083b];
+  for (const [level, table] of [['L', L], ['M', M], ['Q', Q], ['H', H]]) {
+    check(`format bits, level ${level}`,
+      table.map((_, mask) => formatBits(level, mask)), table);
+  }
+  check('version bits 7-10',
+    [7, 8, 9, 10].map(versionBits), [0x07c94, 0x085bc, 0x09a99, 0x0a4d3]);
+}
+
+/* ------------------------------------------------------------------- Structure */
+
+group('Matrix structure');
+{
+  const q = encode('STRUCTURE', { ecc: 'M' });
+  const at = (r, c) => q.modules[r][c];
+
+  ok('size follows version', q.size === q.version * 4 + 17, `size ${q.size}, version ${q.version}`);
+
+  const finderOk = ([r0, c0]) => {
+    for (let r = 0; r < 7; r++) for (let c = 0; c < 7; c++) {
+      const ring = (r === 0 || r === 6 || c === 0 || c === 6);
+      const core = r >= 2 && r <= 4 && c >= 2 && c <= 4;
+      if (at(r0 + r, c0 + c) !== (ring || core ? 1 : 0)) return false;
+    }
+    return true;
+  };
+  ok('finder top-left', finderOk([0, 0]));
+  ok('finder top-right', finderOk([0, q.size - 7]));
+  ok('finder bottom-left', finderOk([q.size - 7, 0]));
+
+  let timing = true;
+  for (let i = 8; i < q.size - 8; i++) {
+    if (at(6, i) !== (i % 2 === 0 ? 1 : 0)) timing = false;
+    if (at(i, 6) !== (i % 2 === 0 ? 1 : 0)) timing = false;
+  }
+  ok('timing patterns alternate', timing);
+  ok('dark module set', at(q.size - 8, 8) === 1);
+
+  let unset = 0;
+  for (let r = 0; r < q.size; r++) for (let c = 0; c < q.size; c++) if (at(r, c) < 0) unset++;
+  ok('every module written', unset === 0, `${unset} left unset`);
+}
+
+/* --------------------------------------------------------------- Round trip
+   Read the matrix back the way a scanner does: recover the format info, undo
+   the mask, walk the same zigzag, de-interleave, and rebuild the string.
+   This is what proves the data placement order, not just that it looks right. */
+
+group('Decode round trip');
+
+const MASKS = [
+  (r, c) => (r + c) % 2 === 0,
+  (r) => r % 2 === 0,
+  (r, c) => c % 3 === 0,
+  (r, c) => (r + c) % 3 === 0,
+  (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+  (r, c) => ((r * c) % 2) + ((r * c) % 3) === 0,
+  (r, c) => ((((r * c) % 2) + ((r * c) % 3)) % 2) === 0,
+  (r, c) => ((((r + c) % 2) + ((r * c) % 3)) % 2) === 0,
+];
+const LEVEL_FROM_BITS = { 0b01: 'L', 0b00: 'M', 0b11: 'Q', 0b10: 'H' };
+
+function decode(q) {
+  // 1. Format information from the copy beside the top-left finder.
+  let raw = 0;
+  const read = (r, c) => q.modules[r][c];
+  const bits = [];
+  for (let i = 0; i <= 5; i++) bits[i] = read(8, i);
+  bits[6] = read(8, 7); bits[7] = read(8, 8); bits[8] = read(7, 8);
+  for (let i = 9; i <= 14; i++) bits[i] = read(14 - i, 8);
+  for (let i = 0; i < 15; i++) raw |= bits[i] << i;
+
+  const unmasked = raw ^ 0x5412;
+  const level = LEVEL_FROM_BITS[(unmasked >> 13) & 0b11];
+  const mask = (unmasked >> 10) & 0b111;
+
+  // 2. Undo the mask over data modules only.
+  const fn = MASKS[mask];
+  const grid = q.modules.map((row, r) =>
+    Array.from(row, (v, c) => (!q.reserved[r][c] && fn(r, c)) ? v ^ 1 : v));
+
+  // 3. Same zigzag, reading instead of writing.
+  const bitsOut = [];
+  let upward = true;
+  for (let right = q.size - 1; right > 0; right -= 2) {
+    if (right === 6) right--;
+    for (let step = 0; step < q.size; step++) {
+      const row = upward ? q.size - 1 - step : step;
+      for (const col of [right, right - 1]) {
+        if (q.reserved[row][col]) continue;
+        bitsOut.push(grid[row][col]);
+      }
+    }
+    upward = !upward;
+  }
+  const codewords = [];
+  for (let i = 0; i + 8 <= bitsOut.length; i += 8) {
+    codewords.push(bitsOut.slice(i, i + 8).reduce((acc, b) => (acc << 1) | b, 0));
+  }
+
+  // 4. De-interleave back into blocks and keep the data half.
+  const { g1n, g1c, g2n, g2c } = blockStructure(q.version, level);
+  const sizes = [...Array(g1n).fill(g1c), ...Array(g2n).fill(g2c)];
+  const blocks = sizes.map(() => []);
+  let idx = 0;
+  const maxLen = Math.max(...sizes);
+  for (let i = 0; i < maxLen; i++) {
+    for (let b = 0; b < sizes.length; b++) {
+      if (i < sizes[b]) blocks[b].push(codewords[idx++]);
+    }
+  }
+  const data = blocks.flat();
+
+  // 5. Strip the byte-mode header and rebuild the text.
+  const countBits = q.version < 10 ? 8 : 16;
+  let pos = 0;
+  const takeBits = n => {
+    let v = 0;
+    for (let i = 0; i < n; i++) {
+      const byte = data[(pos >> 3)] ?? 0;
+      v = (v << 1) | ((byte >> (7 - (pos & 7))) & 1);
+      pos++;
+    }
+    return v;
+  };
+  const mode = takeBits(4);
+  const length = takeBits(countBits);
+  const bytes = [];
+  for (let i = 0; i < length; i++) bytes.push(takeBits(8));
+
+  return { mode, level, mask, text: new TextDecoder().decode(Uint8Array.from(bytes)) };
+}
+
+{
+  const cases = [
+    'A',
+    'Pantry Shelf 2',
+    'https://cgrant10.github.io/grant_inventory/#/l/pantry-shelf-2-5ewy',
+    'https://cgrant10.github.io/grant_inventory/#/l/' + slug('Garage overflow tote number four'),
+    // 100 bytes fits every level at version 10. Level H tops out at 119, which
+    // is the documented ceiling of this encoder, not a defect.
+    'x'.repeat(100),
+    'café — naïve ★ 日本',            // multi-byte UTF-8
+  ];
+  for (const text of cases) {
+    for (const level of ['L', 'M', 'Q', 'H']) {
+      let result;
+      try { result = decode(encode(text, { ecc: level })); }
+      catch (err) { ok(`${level}: ${text.slice(0, 28)}`, false, err.message); continue; }
+      const label = `${level} v? "${text.slice(0, 28)}${text.length > 28 ? '…' : ''}"`;
+      ok(`${label} — text`, result.text === text, `got "${result.text}"`);
+      ok(`${label} — level read back`, result.level === level, `got ${result.level}`);
+      ok(`${label} — byte mode`, result.mode === 4, `got mode ${result.mode}`);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ Versions */
+
+group('Version selection');
+{
+  const v = n => encode('x'.repeat(n), { ecc: 'M' }).version;
+  ok('short payload uses version 1', v(10) === 1, `got ${v(10)}`);
+  ok('growing payload grows the version', v(10) <= v(40) && v(40) <= v(120),
+     `${v(10)}, ${v(40)}, ${v(120)}`);
+  let threw = false;
+  try { encode('x'.repeat(400), { ecc: 'H' }); } catch { threw = true; }
+  ok('oversized payload is rejected, not silently truncated', threw);
+
+  // Location URLs are ~70 bytes; this is the headroom that matters in practice.
+  const url = 'https://cgrant10.github.io/grant_inventory/#/l/' + slug('Garage Overflow Tote 4');
+  ok(`location URL fits at level H (${url.length} bytes)`,
+     (() => { try { return encode(url, { ecc: 'H' }).version <= 10; } catch { return false; } })());
+}
+
+/* ------------------------------------------------------------------ Slugs */
+
+group('Slugs');
+{
+  ok('slug is url-safe', /^[a-z0-9-]+$/.test(slug('Pantry Shelf #2!')), slug('Pantry Shelf #2!'));
+  ok('slug keeps a readable stem', slug('Garage Bin').startsWith('garage-bin'));
+  const many = new Set(Array.from({ length: 5000 }, () => slug('Pantry Shelf 2')));
+  ok('5000 slugs from one name are unique', many.size === 5000, `${many.size} unique`);
+  ok('empty name still yields a slug', slug('').length > 4, slug(''));
+  ok('no confusable characters in the suffix',
+     Array.from({ length: 200 }, () => slug('x').split('-').pop()).every(s => !/[lo01]/.test(s)));
+}
+
+/* ------------------------------------------------------------------ Summary */
+
+const summary = document.getElementById('summary');
+summary.className = failed ? 'bad' : 'ok';
+summary.textContent = failed ? `${failed} failed, ${passed} passed` : `All ${passed} tests passed`;
+
+const samples = document.getElementById('samples');
+for (const text of [
+  'https://cgrant10.github.io/grant_inventory/#/l/pantry-shelf-2-5ewy',
+  'https://cgrant10.github.io/grant_inventory/#/l/garage-tote-a-9k2m',
+  'Grant Household Inventory',
+]) {
+  samples.insertAdjacentHTML('beforeend',
+    `<figure>${toSvg(text)}<figcaption>${text}</figcaption></figure>`);
+}
+</script>
+</body>
+</html>

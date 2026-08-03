@@ -90,6 +90,93 @@
   color: var(--accent);
 }
 
+/* ---- Places ---- */
+
+/* Indent by depth so the tree is readable without drawing lines. */
+.place-row { padding-left: calc(var(--sp-4) + var(--depth, 0) * 18px); }
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+}
+.crumb { color: var(--accent); font-weight: 600; }
+.crumb-sep { color: var(--text-3); }
+
+.place-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.place-name {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.row-title.danger { color: var(--danger); }
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.qr-card {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+}
+/* A QR always needs a light quiet zone, whatever the app theme is doing. */
+.qr {
+  padding: 6px;
+  border-radius: var(--r-sm);
+  background: #fff;
+}
+.qr svg { display: block; width: 100%; height: 100%; }
+
+/* ---- Printable labels ---- */
+
+.label-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--sp-3);
+}
+.label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  background: #fff;
+  color: #111;
+  break-inside: avoid;
+}
+.label-qr { flex: none; width: 92px; height: 92px; padding: 0; }
+.label-text { min-width: 0; }
+.label-name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.label-path, .label-kind { font-size: 11px; color: #555; }
+.label-path { overflow-wrap: anywhere; }
+
+@media print {
+  .topbar, .tabbar, .no-print, .update-bar, .toasts { display: none !important; }
+  body, .view { background: #fff; color: #000; }
+  .view { max-width: none; padding: 0; }
+  .label-sheet { grid-template-columns: repeat(2, 1fr); gap: 6mm; }
+  .label { border-color: #999; }
+}
+
 /* ---- Settings ---- */
 
 .kv {
