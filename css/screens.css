@@ -133,6 +133,71 @@
 }
 .qr svg { display: block; width: 100%; height: 100%; }
 
+/* ---- Items ---- */
+
+/* The stepper is the most-used control in the app, so the targets are large
+   even in the compact list variant. */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+}
+.step-btn {
+  display: grid;
+  place-items: center;
+  width: 46px; height: 46px;
+  border-radius: var(--r-full);
+  background-color: var(--surface-2);
+  color: var(--text);
+  transition: transform var(--fast) var(--ease);
+}
+.step-btn:active { transform: scale(.9); }
+.step-btn[disabled] { opacity: .3; pointer-events: none; }
+.step-readout {
+  display: grid;
+  justify-items: center;
+  min-width: 46px;
+}
+.step-value {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.step-unit { font-size: var(--fs-xs); color: var(--text-3); }
+
+.stepper.is-compact { gap: var(--sp-1); }
+.stepper.is-compact .step-btn { width: 40px; height: 40px; }
+.stepper.is-compact .step-readout { min-width: 34px; }
+.stepper.is-compact .step-value { font-size: var(--fs-lg); }
+
+.item-row { gap: var(--sp-2); }
+.item-link { display: block; min-width: 0; }
+.item-link .row-sub {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.qty-card {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+}
+.qty-card .stepper { gap: var(--sp-5); }
+.qty-card .step-btn { width: 62px; height: 62px; }
+.qty-card .step-value { font-size: var(--fs-3xl); }
+
+.field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+.field-pair:has(> :only-child) { grid-template-columns: 1fr; }
+
+.pad { padding: var(--sp-4); }
+
 /* ---- Printable labels ---- */
 
 .label-sheet {

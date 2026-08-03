@@ -43,7 +43,7 @@ export function makeRepo(table) {
       };
       await idb.put(table, row);
       await queueUpsert(table, row);
-      emit(EVENTS.DATA_CHANGED, { table });
+      emit(EVENTS.DATA_CHANGED, { table, source: 'local' });
       return row;
     },
 
@@ -53,7 +53,7 @@ export function makeRepo(table) {
       const row = { ...current, ...patch, updated_at: nowIso() };
       await idb.put(table, row);
       await queueUpsert(table, row);
-      emit(EVENTS.DATA_CHANGED, { table });
+      emit(EVENTS.DATA_CHANGED, { table, source: 'local' });
       return row;
     },
 

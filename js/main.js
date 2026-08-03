@@ -47,13 +47,14 @@ function defineRoutes() {
   // Scanning a bin's QR code lands here.
   router.define('/l/:slug',   () => import('./screens/location.js'));
 
+  router.define('/inventory', () => import('./screens/inventory.js'));
+  router.define('/item/:id',  () => import('./screens/item.js'));
+
   const later = () => import('./screens/placeholder.js');
-  router.define('/inventory',   async () => ({ default: (await later()).inventory }));
   router.define('/scan',        async () => ({ default: (await later()).scan }));
   router.define('/shopping',    async () => ({ default: (await later()).shopping }));
   router.define('/measurements',async () => ({ default: (await later()).measurements }));
   router.define('/projects',    async () => ({ default: (await later()).projects }));
-  router.define('/item/:id',    async () => ({ default: (await later()).inventory }));
 }
 
 function onRouteChange({ path }) {
@@ -187,7 +188,12 @@ async function startApp() {
   document.getElementById('settings-btn').onclick = () => router.go('/settings');
 
   on(EVENTS.SYNC_STATE, state => { syncDot.dataset.state = state; });
-  on(EVENTS.DATA_CHANGED, () => router.refresh());
+  // Only repaint for changes that arrived from another device. A local write
+  // already updated whatever made it, and re-rendering mid-interaction would
+  // replace the control under the user's finger — the stepper especially.
+  on(EVENTS.DATA_CHANGED, detail => {
+    if (detail?.source === 'sync') router.refresh();
+  });
 
   wireUpdateBar();
   sync.start();

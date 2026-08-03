@@ -119,8 +119,27 @@ async function push() {
 
 /* ---- Pull ---- */
 
+/**
+ * Items whose quantity the server has not heard the whole story about yet.
+ *
+ * Quantity is server-owned, computed from item_events — but only from events it
+ * has actually received. While events sit in the outbox the server's figure is
+ * stale by definition, so accepting it would undo work the user can see: create
+ * an item at 4 and a pull landing before the 'add' event pushes resets it to 0;
+ * use three cans offline and the count springs back up, then down again.
+ */
+async function itemsAwaitingEvents() {
+  const ops = await idb.outboxAll();
+  const ids = new Set();
+  for (const op of ops) {
+    if (op.table === 'item_events' && op.payload?.item_id) ids.add(op.payload.item_id);
+  }
+  return ids;
+}
+
 async function pull() {
   const touched = new Set();
+  const unsettled = await itemsAwaitingEvents();
 
   for (const table of TABLE_NAMES) {
     const column = cursorColumn(table);
@@ -128,8 +147,18 @@ async function pull() {
 
     // Page until the server stops handing back full pages.
     for (;;) {
-      const rows = await sb.selectSince(table, column, cursor, 1000);
+      let rows = await sb.selectSince(table, column, cursor, 1000);
       if (!rows?.length) break;
+
+      if (table === 'items' && unsettled.size) {
+        rows = await Promise.all(rows.map(async row => {
+          if (!unsettled.has(row.id)) return row;
+          const local = await idb.get('items', row.id);
+          // Take every other field from the server; keep our quantity until the
+          // events that justify it have been delivered.
+          return local ? { ...row, quantity: local.quantity } : row;
+        }));
+      }
 
       await idb.putMany(table, rows);
       cursor = rows[rows.length - 1][column];
@@ -140,7 +169,7 @@ async function pull() {
     }
   }
 
-  for (const table of touched) emit(EVENTS.DATA_CHANGED, { table });
+  for (const table of touched) emit(EVENTS.DATA_CHANGED, { table, source: 'sync' });
 }
 
 /* ---- Lifecycle ---- */
