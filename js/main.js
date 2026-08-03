@@ -50,8 +50,9 @@ function defineRoutes() {
   router.define('/inventory', () => import('./screens/inventory.js'));
   router.define('/item/:id',  () => import('./screens/item.js'));
 
+  router.define('/scan', () => import('./screens/scan.js'));
+
   const later = () => import('./screens/placeholder.js');
-  router.define('/scan',        async () => ({ default: (await later()).scan }));
   router.define('/shopping',    async () => ({ default: (await later()).shopping }));
   router.define('/measurements',async () => ({ default: (await later()).measurements }));
   router.define('/projects',    async () => ({ default: (await later()).projects }));

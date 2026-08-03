@@ -39,6 +39,7 @@
 <script type="module">
 import { encode, toSvg, rsEncode, formatBits, versionBits, blockStructure } from './js/vendor/qr.js';
 import { slug } from './js/core/model.js';
+import * as ean from './js/vendor/ean.js';
 
 const out = document.getElementById('out');
 let passed = 0, failed = 0;
@@ -335,6 +336,113 @@ group('Rendering');
   const px = (x, y) => { const i = (y * side + x) * 4; return (data[i] + data[i+1] + data[i+2]) / 3; };
   ok('quiet zone is light', px(2, 2) > 200 && px(side - 3, 2) > 200 && px(2, side - 3) > 200,
      `${px(2,2)}, ${px(side-3,2)}, ${px(2,side-3)}`);
+}
+
+/* ------------------------------------------------------------------- Barcodes
+   Check digits verified by hand against the EAN/UPC rule, so these are real
+   vectors and not the implementation checking itself. */
+
+group('Barcodes — check digits');
+{
+  check('EAN-13 4006381333931', ean.checkDigit('400638133393'), 1);
+  check('UPC-A 036000291452',   ean.checkDigit('03600029145'), 2);
+  check('EAN-8  96385074',      ean.checkDigit('9638507'), 4);
+
+  ok('valid EAN-13 accepted', ean.isValidBarcode('4006381333931'));
+  ok('valid UPC-A accepted',  ean.isValidBarcode('036000291452'));
+  ok('valid EAN-8 accepted',  ean.isValidBarcode('96385074'));
+  ok('wrong check digit rejected', !ean.isValidBarcode('4006381333932'));
+  ok('short code rejected', !ean.isValidBarcode('12345'));
+  ok('non-numeric rejected', !ean.isValidBarcode('40063813339a1'));
+}
+
+group('Barcodes — bit round trip');
+{
+  const codes = ['4006381333931', '5901234123457', '0012345678905', '9780306406157'];
+  for (const code of codes) {
+    const bits = ean.encodeEan13(code);
+    ok(`${code} encodes to 95 modules`, bits.length === 95, `got ${bits.length}`);
+    check(`${code} decodes back`, ean.decodeEan13Bits(bits), code);
+  }
+  const eight = ean.encodeEan8('96385074');
+  ok('EAN-8 encodes to 67 modules', eight.length === 67, `got ${eight.length}`);
+  check('EAN-8 decodes back', ean.decodeEan8Bits(eight), '96385074');
+
+  // A corrupted module must not produce a plausible-looking number.
+  const broken = ean.encodeEan13('4006381333931').split('');
+  broken[20] = broken[20] === '1' ? '0' : '1';
+  ok('corrupted bits decode to null, not a wrong number',
+     ean.decodeEan13Bits(broken.join('')) === null);
+}
+
+/* Turn a module string into pixels the way a camera would see it: a quiet zone,
+   several pixels per module, and optional blur and noise. */
+function barsToRow(bits, { scale = 3, quiet = 20, noise = 0, blur = 0, dark = 30, light = 225 } = {}) {
+  const width = quiet * 2 + bits.length * scale;
+  const row = new Uint8ClampedArray(width).fill(light);
+  for (let m = 0; m < bits.length; m++) {
+    if (bits[m] !== '1') continue;
+    for (let p = 0; p < scale; p++) row[quiet + m * scale + p] = dark;
+  }
+  if (blur) {
+    const copy = Uint8ClampedArray.from(row);
+    for (let i = blur; i < width - blur; i++) {
+      let sum = 0;
+      for (let k = -blur; k <= blur; k++) sum += copy[i + k];
+      row[i] = sum / (blur * 2 + 1);
+    }
+  }
+  if (noise) {
+    for (let i = 0; i < width; i++) {
+      row[i] = Math.max(0, Math.min(255, row[i] + (Math.sin(i * 12.9898) * 43758.5453 % 1) * noise));
+    }
+  }
+  return row;
+}
+
+group('Barcodes — decoding a scanline');
+{
+  const code = '4006381333931';
+  const bits = ean.encodeEan13(code);
+
+  check('clean scanline', ean.decodeRow(barsToRow(bits)), code);
+  check('narrow modules (2px)', ean.decodeRow(barsToRow(bits, { scale: 2 })), code);
+  check('wide modules (6px)', ean.decodeRow(barsToRow(bits, { scale: 6 })), code);
+  check('low contrast', ean.decodeRow(barsToRow(bits, { dark: 90, light: 165 })), code);
+  check('blurred', ean.decodeRow(barsToRow(bits, { scale: 4, blur: 1 })), code);
+  check('upside down', ean.decodeRow(Uint8ClampedArray.from(barsToRow(bits)).reverse()), code);
+  check('EAN-8 scanline', ean.decodeRow(barsToRow(ean.encodeEan8('96385074'))), '96385074');
+
+  const blank = new Uint8ClampedArray(400).fill(200);
+  ok('blank frame decodes to null', ean.decodeRow(blank) === null);
+  ok('flat dark frame decodes to null',
+     ean.decodeRow(new Uint8ClampedArray(400).fill(20)) === null);
+}
+
+group('Barcodes — decoding a frame');
+{
+  const code = '5901234123457';
+  const bits = ean.encodeEan13(code);
+  const row = barsToRow(bits, { scale: 4 });
+  const width = row.length, height = 80;
+  const data = new Uint8ClampedArray(width * height * 4);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      // Bars only occupy the middle band; the rest is background, as on a label.
+      const v = (y > 15 && y < 65) ? row[x] : 235;
+      const p = (y * width + x) * 4;
+      data[p] = data[p + 1] = data[p + 2] = v;
+      data[p + 3] = 255;
+    }
+  }
+  check('decodes from an ImageData frame',
+        ean.decodeImage({ width, height, data }), code);
+
+  const empty = new Uint8ClampedArray(width * height * 4).fill(240);
+  for (let i = 3; i < empty.length; i += 4) empty[i] = 255;
+  ok('empty frame decodes to null',
+     ean.decodeImage({ width, height, data: empty }) === null);
 }
 
 /* ------------------------------------------------------------------ Summary */

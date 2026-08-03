@@ -9,7 +9,10 @@ import { itemRepo } from '../data/items.js';
 import { locationRepo } from '../data/locations.js';
 import { categoryRepo } from '../data/categories.js';
 
-export async function itemForm({ item = null, locationId = null, onDone } = {}) {
+/**
+ * @param {object=} opts.prefill  seed a new item from a scan: { name, unit, product_id }
+ */
+export async function itemForm({ item = null, locationId = null, prefill = null, onDone } = {}) {
   const editing = Boolean(item);
   const [places, categories] = await Promise.all([
     locationRepo.flatTree(),
@@ -17,7 +20,7 @@ export async function itemForm({ item = null, locationId = null, onDone } = {}) 
   ]);
 
   const name = el('input', {
-    class: 'field', type: 'text', value: item?.name ?? '',
+    class: 'field', type: 'text', value: item?.name ?? prefill?.name ?? '',
     placeholder: 'Black beans, paper towels…', autocapitalize: 'sentences',
   });
 
@@ -26,7 +29,7 @@ export async function itemForm({ item = null, locationId = null, onDone } = {}) 
     value: editing ? '' : '1', placeholder: 'Quantity',
   });
 
-  const unit = select(UNITS.map(u => [u, u]), item?.unit ?? 'ea');
+  const unit = select(UNITS.map(u => [u, u]), item?.unit ?? prefill?.unit ?? 'ea');
 
   const place = select(
     [['', 'No place yet'], ...places.map(p => [p.id, `${'— '.repeat(p.depth)}${p.name}`])],
@@ -81,7 +84,12 @@ export async function itemForm({ item = null, locationId = null, onDone } = {}) 
     try {
       const saved = editing
         ? await itemRepo.update(item.id, fields)
-        : await itemRepo.create({ ...fields, quantity: qty.value === '' ? 0 : Number(qty.value) });
+        : await itemRepo.create({
+            ...fields,
+            // Keeps the barcode attached, so the next scan finds this item.
+            product_id: prefill?.product_id ?? null,
+            quantity: qty.value === '' ? 0 : Number(qty.value),
+          });
       close();
       toast(editing ? 'Saved' : `Added ${trimmed}`);
       onDone?.(saved);
