@@ -41,15 +41,19 @@
     <img class="gate-logo" src="assets/logo.png" alt="Grant Household Inventory" width="512" height="512">
     <h1 class="sr-only">Grant Household Inventory</h1>
     <p class="gate-sub">Enter the household passphrase to sync with everyone else.</p>
-    <form id="gate-form" autocomplete="on">
-      <input id="gate-name" class="field" type="text" placeholder="Your name" autocomplete="name" required>
+    <!-- No `required` attributes: a hidden required field blocks submit with no
+         visible reaction at all. Validation happens in JS, where it can explain
+         itself. -->
+    <form id="gate-form" autocomplete="on" novalidate>
+      <input id="gate-name" class="field" type="text" placeholder="Your name" autocomplete="name">
       <input id="gate-pass" class="field" type="password" placeholder="Household passphrase"
-             autocomplete="current-password" required>
-      <button class="btn btn-primary btn-lg" type="submit">Unlock</button>
+             autocomplete="current-password">
+      <button id="gate-submit" class="btn btn-primary btn-lg" type="submit">Unlock</button>
     </form>
     <p id="gate-error" class="gate-error" hidden></p>
     <div id="gate-install" class="gate-install" hidden></div>
     <button id="gate-offline" class="btn btn-ghost">Use offline on this phone only</button>
+    <p id="gate-version" class="version"></p>
   </div>
 </div>
 

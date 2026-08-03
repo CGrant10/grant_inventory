@@ -42,10 +42,22 @@ export function setDeviceName(name) {
 /** Sign in to the shared household account and remember this device's member name. */
 export async function unlockCloud(passphrase, name) {
   if (!isConfigured()) throw new Error('No Supabase project is configured yet.');
+
+  // Sign in first: if this fails, nothing has changed and the gate stays put.
   await sb.signIn(HOUSEHOLD_EMAIL, passphrase);
+
   localStorage.setItem(MODE_KEY, 'cloud');
   setDeviceName(name);
-  await ensureMember();
+
+  // Registering the member is a nicety for the history feed, not a gate. If it
+  // fails, the sign-in still stands and the outbox will retry — failing the
+  // whole unlock here would strand the user with a valid session they can't use.
+  try {
+    await ensureMember();
+  } catch (err) {
+    console.warn('[auth] could not register this device as a member', err);
+  }
+
   emit(EVENTS.AUTH_CHANGED);
 }
 

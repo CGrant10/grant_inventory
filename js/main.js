@@ -82,6 +82,11 @@ function showGate() {
   nameEl.value = auth.device().name === 'Me' ? '' : auth.device().name;
   mountInstall(document.getElementById('gate-install'), { className: 'btn btn-block' });
 
+  // Which build is this phone actually running? Answers the first question of
+  // every "it isn't working" conversation.
+  document.getElementById('gate-version').textContent =
+    `Version ${VERSION} · ${isConfigured() ? 'household sync ready' : 'local only'}`;
+
   if (!isConfigured()) {
     passEl.hidden = true;
     passEl.required = false;
@@ -89,22 +94,40 @@ function showGate() {
       'No Supabase project is connected yet. Start on this phone — you can connect the household later in Settings.';
   }
 
-  form.onsubmit = async e => {
-    e.preventDefault();
+  const btn = document.getElementById('gate-submit');
+
+  const fail = message => {
+    errEl.textContent = message;
+    errEl.hidden = false;
+  };
+
+  const submit = async () => {
+    if (btn.disabled) return;
     errEl.hidden = true;
-    const btn = form.querySelector('button');
+
+    const name = nameEl.value.trim();
+    if (!name) return fail('Enter your name so the household knows who did what.');
+    if (isConfigured() && !passEl.value) return fail('Enter the household passphrase.');
+
     btn.disabled = true;
+    btn.textContent = 'Unlocking…';
     try {
-      if (isConfigured()) await auth.unlockCloud(passEl.value, nameEl.value);
-      else auth.unlockLocal(nameEl.value);
+      if (isConfigured()) await withTimeout(auth.unlockCloud(passEl.value, name), 20_000);
+      else auth.unlockLocal(name);
       await startApp();
     } catch (err) {
-      errEl.textContent = friendly(err.message);
-      errEl.hidden = false;
+      console.error('[gate]', err);
+      fail(friendly(err?.message || String(err)));
     } finally {
       btn.disabled = false;
+      btn.textContent = 'Unlock';
     }
   };
+
+  form.onsubmit = e => { e.preventDefault(); submit(); };
+  // Belt and braces: if the form's submit event is ever swallowed, the button
+  // still works. submit() guards against running twice.
+  btn.onclick = e => { e.preventDefault(); submit(); };
 
   offlineBtn.onclick = async () => {
     auth.unlockLocal(nameEl.value || 'Me');
@@ -112,9 +135,26 @@ function showGate() {
   };
 }
 
+/** Never let a request hang silently — a spinner that never stops reads as "broken". */
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timed out reaching Supabase.')), ms)),
+  ]);
+}
+
 function friendly(message) {
-  if (/invalid login|invalid grant|credentials/i.test(message)) return 'That passphrase does not match.';
-  if (/failed to fetch|networkerror/i.test(message)) return 'Could not reach Supabase. Check the connection and try again.';
+  if (/invalid login|invalid grant|credentials/i.test(message)) {
+    return 'That passphrase does not match the household account.';
+  }
+  if (/email not confirmed|not confirmed/i.test(message)) {
+    return 'The household account exists but is unconfirmed. In Supabase → Authentication → Users, confirm it.';
+  }
+  if (/failed to fetch|networkerror|load failed/i.test(message)) {
+    return 'Could not reach Supabase. Check your connection and try again.';
+  }
+  if (/timed out/i.test(message)) return 'Timed out reaching Supabase. Try again.';
   return message;
 }
 
