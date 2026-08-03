@@ -11,7 +11,7 @@ import * as sb from './supabase.js';
 import { TABLE_NAMES, APPEND_ONLY } from './model.js';
 import { emit, EVENTS } from './bus.js';
 import { isConfigured, PULL_INTERVAL_MS } from './config.js';
-import { mode } from './auth.js';
+import { isSyncing } from './auth.js';
 
 let running = false;
 let queued = false;
@@ -37,7 +37,7 @@ export function kick() {
 
 export async function sync() {
   if (running) { queued = true; return; }
-  if (mode() !== 'cloud' || !isConfigured()) { setState('local'); return; }
+  if (!isSyncing() || !isConfigured()) { setState('local'); return; }
   if (!navigator.onLine) { setState('offline'); return; }
 
   running = true;

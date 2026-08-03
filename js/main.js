@@ -1,7 +1,7 @@
 // Boot: register the service worker, gate on the household passphrase, wire the
 // router and the sync engine, then get out of the way.
 
-import { VERSION, isConfigured } from './core/config.js';
+import { VERSION, isConfigured, REQUIRE_PASSPHRASE } from './core/config.js';
 import * as auth from './core/auth.js';
 import * as router from './core/router.js';
 import * as sync from './core/sync.js';
@@ -86,16 +86,26 @@ function showGate() {
   // Which build is this phone actually running? Answers the first question of
   // every "it isn't working" conversation.
   document.getElementById('gate-version').textContent =
-    `Version ${VERSION} · ${isConfigured() ? 'household sync ready' : 'local only'}`;
+    `Version ${VERSION} · ${isConfigured() ? 'shared household' : 'local only'}`;
+
+  // Three shapes of gate, decided here so the submit path stays simple:
+  //   no project      -> name only, this phone only
+  //   open access     -> name only, straight into the shared database
+  //   passphrase build-> name + passphrase
+  const needsPassphrase = isConfigured() && REQUIRE_PASSPHRASE;
+  const sub = document.querySelector('.gate-sub');
+  const btn = document.getElementById('gate-submit');
 
   if (!isConfigured()) {
     passEl.hidden = true;
-    passEl.required = false;
-    document.querySelector('.gate-sub').textContent =
-      'No Supabase project is connected yet. Start on this phone — you can connect the household later in Settings.';
+    sub.textContent = 'No Supabase project is connected yet. Start on this phone — '
+      + 'you can connect the household later in Settings.';
+  } else if (!needsPassphrase) {
+    passEl.hidden = true;
+    sub.textContent = 'Enter your name and you’re in. Everyone in the house shares the same list.';
+    btn.textContent = 'Start';
+    offlineBtn.hidden = true;
   }
-
-  const btn = document.getElementById('gate-submit');
 
   const fail = message => {
     errEl.textContent = message;
@@ -108,12 +118,14 @@ function showGate() {
 
     const name = nameEl.value.trim();
     if (!name) return fail('Enter your name so the household knows who did what.');
-    if (isConfigured() && !passEl.value) return fail('Enter the household passphrase.');
+    if (needsPassphrase && !passEl.value) return fail('Enter the household passphrase.');
 
+    const restore = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Unlocking…';
+    btn.textContent = needsPassphrase ? 'Unlocking…' : 'Starting…';
     try {
-      if (isConfigured()) await withTimeout(auth.unlockCloud(passEl.value, name), 20_000);
+      if (needsPassphrase) await withTimeout(auth.unlockCloud(passEl.value, name), 20_000);
+      else if (isConfigured()) await withTimeout(auth.unlockOpen(name), 20_000);
       else auth.unlockLocal(name);
       await startApp();
     } catch (err) {
@@ -121,7 +133,7 @@ function showGate() {
       fail(friendly(err?.message || String(err)));
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Unlock';
+      btn.textContent = restore;
     }
   };
 

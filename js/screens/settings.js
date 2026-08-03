@@ -10,6 +10,12 @@ import { mountInstall } from '../ui/install.js';
 import { isInstalled as installed, mode as installMode } from '../core/install.js';
 import * as updates from '../core/updates.js';
 
+const MODE_LABEL = {
+  open:  'Shared household',
+  cloud: 'Shared household',
+  local: 'This phone only',
+};
+
 const INSTALL_LABEL = {
   installed:   'Installed app',
   prompt:      'Browser tab',
@@ -76,7 +82,7 @@ export default async function settings() {
 
     el('div', { class: 'section-title', text: 'Sync' }),
     el('div', { class: 'card stack-sm' }, [
-      kv('Mode', auth.mode() === 'cloud' ? 'Shared household' : 'This phone only'),
+      kv('Mode', MODE_LABEL[auth.mode()] ?? 'This phone only'),
       kv('Last sync', lastSync ? new Date(lastSync).toLocaleString() : 'Never'),
       kv('Waiting to send', String(pending)),
       el('button', {
@@ -135,7 +141,10 @@ export default async function settings() {
           toast('Refreshed from the server');
         },
       }),
-      el('button', {
+      // Only meaningful when there's a session to end. In open-access mode there
+      // is no sign-in, so this would just bounce the user to the gate to retype
+      // their name for no reason.
+      auth.mode() !== 'cloud' ? null : el('button', {
         class: 'btn btn-danger btn-block',
         text: 'Sign out of this household',
         onclick: async () => {

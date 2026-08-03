@@ -42,6 +42,23 @@ Serve the folder over HTTP — service workers and ES modules will not run from 
 python -m http.server 8080
 ```
 
+## Access modes
+
+Two settings must agree — the flag in the app and the policies in Postgres:
+
+| Mode | `REQUIRE_PASSPHRASE` | SQL to run | Who can read/write |
+|---|---|---|---|
+| Open (current) | `false` | `supabase/open-access.sql` | anyone with the URL |
+| Passphrase | `true` | `supabase/lock-down.sql` | household account only |
+
+Open mode is a deliberate trade: the publishable key ships in a public bundle from
+a public repo, so "no sign-in" means the data is public. Anonymous access is granted
+select/insert/update but **not** delete — the app only soft-deletes, so a passer-by
+still cannot hard-drop rows.
+
+Set the flag without running the matching SQL and the app either shows a gate it
+does not need, or fails every request with `violates row-level security policy`.
+
 ## Branding
 
 The badge in `assets/logo-source.png` is the single source for every icon —
