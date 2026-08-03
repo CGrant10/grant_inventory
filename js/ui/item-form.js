@@ -41,7 +41,7 @@ export async function itemForm({ item = null, locationId = null, prefill = null,
 
   const minQty = el('input', {
     class: 'field', type: 'number', inputmode: 'decimal', min: '0', step: 'any',
-    value: item?.min_quantity ?? '', placeholder: 'Tell me when it drops to…',
+    value: item?.min_quantity ?? '', placeholder: 'Keep at least this many',
   });
 
   const expires = el('input', {
@@ -53,7 +53,7 @@ export async function itemForm({ item = null, locationId = null, prefill = null,
 
   const more = el('div', { class: 'stack-sm', hidden: true }, [
     el('label', { class: 'field-label', text: 'Category' }), category,
-    el('label', { class: 'field-label', text: 'Warn me below' }), minQty,
+    el('label', { class: 'field-label', text: 'Keep at least' }), minQty,
     el('label', { class: 'field-label', text: 'Expires' }), expires,
     notes,
   ]);

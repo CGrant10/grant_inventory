@@ -51,7 +51,7 @@ export default async function item({ id }) {
 
     el('div', { class: 'card qty-card' }, [
       control,
-      isLow(row) ? el('span', { class: 'badge badge-warn', text: `Low — minimum ${fmtQty(row.min_quantity)}` }) : null,
+      isLow(row) ? el('span', { class: 'badge badge-warn', text: `Low — keep at least ${fmtQty(row.min_quantity)}` }) : null,
       expiry === 'expired' ? el('span', { class: 'badge badge-danger', text: `Expired ${row.expires_on}` })
         : expiry === 'soon' ? el('span', { class: 'badge badge-warn', text: `Expires ${row.expires_on}` })
         : row.expires_on ? el('span', { class: 'badge badge-info', text: `Expires ${row.expires_on}` }) : null,

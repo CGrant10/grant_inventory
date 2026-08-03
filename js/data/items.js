@@ -172,7 +172,7 @@ export const itemRepo = {
   async lowStock() {
     const items = await idb.all('items');
     return items
-      .filter(i => i.min_quantity != null && Number(i.quantity) <= Number(i.min_quantity))
+      .filter(i => i.min_quantity != null && Number(i.quantity) < Number(i.min_quantity))
       .sort((a, b) => Number(a.quantity) - Number(b.quantity));
   },
 
@@ -185,8 +185,14 @@ export const itemRepo = {
   },
 };
 
+/**
+ * Strictly below the minimum, not at it. "Keep at least 2" means two is fine.
+ *
+ * With <=, buying exactly the shortfall landed on the threshold and the shopping
+ * list immediately re-added the line you had just ticked off.
+ */
 export function isLow(item) {
-  return item.min_quantity != null && Number(item.quantity) <= Number(item.min_quantity);
+  return item.min_quantity != null && Number(item.quantity) < Number(item.min_quantity);
 }
 
 export function expiryState(item, soonDays = 14) {

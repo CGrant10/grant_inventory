@@ -1,7 +1,7 @@
 // Service worker. CACHE must be bumped in lockstep with VERSION in
 // js/core/config.js and version.txt, or phones keep serving the old build.
 
-const CACHE = 'grant-inventory-v0.9.0';
+const CACHE = 'grant-inventory-v0.10.0';
 
 // The shell. Everything needed to open the app with no network at all.
 const SHELL = [
@@ -28,6 +28,9 @@ const SHELL = [
   'js/data/locations.js',
   'js/data/items.js',
   'js/data/products.js',
+  'js/data/shopping.js',
+  'js/features/low-stock.js',
+  'js/screens/shopping.js',
   'js/core/scanner.js',
   'js/vendor/ean.js',
   'js/features/barcode-lookup.js',
@@ -127,7 +130,11 @@ self.addEventListener('fetch', event => {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE);
       try {
-        const fresh = await fetch(request);
+        // cache: 'no-cache' forces a revalidation against the server. A plain
+        // fetch() may be answered from the browser's own HTTP cache, which makes
+        // "network-first" quietly mean "possibly minutes stale" — the exact
+        // failure this branch exists to prevent. A 304 keeps it cheap.
+        const fresh = await fetch(request, { cache: 'no-cache' });
         if (fresh.ok) cache.put(request, fresh.clone());
         return fresh;
       } catch {

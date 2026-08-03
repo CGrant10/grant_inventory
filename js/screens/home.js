@@ -3,8 +3,14 @@
 
 import { el, icon, ICONS, empty } from '../ui/dom.js';
 import * as idb from '../core/idb.js';
+import { reconcile } from '../features/low-stock.js';
+import { isLow } from '../data/items.js';
 
 export default async function home() {
+  // Bring the shopping list in step first, or the "To buy" figure here disagrees
+  // with the list itself — which is worse than being slightly slow.
+  await reconcile();
+
   const [items, locations, shopping] = await Promise.all([
     idb.all('items'),
     idb.all('locations'),
@@ -13,9 +19,9 @@ export default async function home() {
 
   if (!items.length && !locations.length) return firstRun();
 
-  const low = items.filter(i => i.min_quantity != null && Number(i.quantity) <= Number(i.min_quantity));
+  const low = items.filter(isLow);
   const soon = expiringSoon(items);
-  const needed = shopping.filter(s => s.status === 'needed');
+  const needed = shopping.filter(s => s.status === 'needed' || s.status === 'in_cart');
 
   return el('div', { class: 'stack' }, [
     el('div', { class: 'stat-grid' }, [

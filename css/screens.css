@@ -198,6 +198,47 @@
 
 .pad { padding: var(--sp-4); }
 
+/* ---- Shopping list ---- */
+
+.shop-row { gap: var(--sp-3); }
+.shop-main { text-align: left; min-width: 0; flex: 1; }
+.shop-main .row-sub { display: flex; align-items: center; gap: var(--sp-2); }
+.shop-row.is-done .row-title {
+  text-decoration: line-through;
+  color: var(--text-3);
+}
+
+/* Deliberately larger than a checkbox: this gets tapped one-handed, in a shop,
+   holding something else. */
+.tickbox {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px; height: 40px;
+  border: 2px solid var(--line-strong);
+  border-radius: var(--r-full);
+  color: transparent;
+  transition: transform var(--fast) var(--ease);
+}
+.tickbox:active { transform: scale(.88); }
+.tickbox.is-cart {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.tickbox.is-bought {
+  border-color: transparent;
+  background-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.link-btn {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 /* ---- Scanner ---- */
 
 .scan-frame {
