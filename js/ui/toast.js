@@ -1,7 +1,7 @@
 // Transient feedback. Undo lives here because most inventory actions (use one,
 // restock, move) are one tap and want a cheap way back.
 
-import { el } from './dom.js';
+import { el, removeAfterExit } from './dom.js';
 
 const root = () => document.getElementById('toasts');
 
@@ -14,7 +14,7 @@ export function toast(message, { kind = 'info', ms = 2600, undo = null } = {}) {
   const dismiss = () => {
     clearTimeout(timer);
     node.classList.add('is-out');
-    node.addEventListener('animationend', () => node.remove(), { once: true });
+    removeAfterExit(node);
   };
 
   if (undo) {

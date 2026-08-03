@@ -24,7 +24,8 @@ export function emit(event, detail) {
 }
 
 export const EVENTS = {
-  DATA_CHANGED: 'data:changed',   // { table }
-  SYNC_STATE:   'sync:state',     // 'synced' | 'syncing' | 'offline' | 'error' | 'local'
-  AUTH_CHANGED: 'auth:changed',
+  DATA_CHANGED:    'data:changed',    // { table }
+  SYNC_STATE:      'sync:state',      // 'synced' | 'syncing' | 'offline' | 'error' | 'local'
+  AUTH_CHANGED:    'auth:changed',
+  INSTALL_CHANGED: 'install:changed',
 };

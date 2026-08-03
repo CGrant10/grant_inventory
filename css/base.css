@@ -17,7 +17,24 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   text-size-adjust: 100%;
+
+  /* Long-pressing a label shouldn't pop the copy/share callout — it makes the
+     app feel like a web page. Fields and anything tagged .selectable opt back
+     in below, so text you actually typed stays editable and copyable. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
+
+input, textarea, select, [contenteditable], .selectable {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Stop the two-tap zoom and the rubber-band drag that give a PWA away. */
+* { touch-action: manipulation; }
+.view, .sheet { touch-action: pan-y; }
 
 h1, h2, h3, p { margin: 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -183,7 +200,8 @@ svg {
   color: var(--danger);
   font-size: var(--fs-sm);
 }
-#gate-offline { margin-top: var(--sp-4); }
+.gate-install { margin-top: var(--sp-4); }
+#gate-offline { margin-top: var(--sp-2); }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }

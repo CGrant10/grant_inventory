@@ -17,6 +17,21 @@
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/screens.css">
+
+<!-- Chrome fires beforeinstallprompt early, often before the module graph has
+     finished loading. Stash it here so js/core/install.js can't miss it. -->
+<script>
+  window.__installPrompt = null;
+  addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    window.__installPrompt = e;
+    dispatchEvent(new Event('installable'));
+  });
+  addEventListener('appinstalled', function () {
+    window.__installPrompt = null;
+    dispatchEvent(new Event('installed'));
+  });
+</script>
 </head>
 <body>
 
@@ -33,6 +48,7 @@
       <button class="btn btn-primary btn-lg" type="submit">Unlock</button>
     </form>
     <p id="gate-error" class="gate-error" hidden></p>
+    <div id="gate-install" class="gate-install" hidden></div>
     <button id="gate-offline" class="btn btn-ghost">Use offline on this phone only</button>
   </div>
 </div>

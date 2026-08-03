@@ -1,8 +1,16 @@
 -- Row-level security. Run AFTER schema.sql.
 --
--- The anon key is public — it ships in the app bundle, as designed. These policies
--- are what actually protect the data: without signing in to the household account,
--- the anon key can read and write nothing.
+-- The publishable key is public — it ships in the app bundle, as designed. These
+-- policies are what actually protect the data.
+--
+-- Access is scoped to the ONE household account, not to "any authenticated user".
+-- That matters: if email signups are enabled on the project, anyone who reads the
+-- key out of the bundle could otherwise register an account and walk straight in.
+
+create or replace function is_household() returns boolean
+language sql stable as $$
+  select coalesce(auth.jwt() ->> 'email', '') = 'household@grant-inventory.local'
+$$;
 
 do $$
 declare t text;
@@ -19,15 +27,14 @@ begin
       create policy %I_rw on %I
         for all
         to authenticated
-        using (true)
-        with check (true)
+        using (is_household())
+        with check (is_household())
     $p$, t, t);
   end loop;
 end $$;
 
--- When a second household is ever added, this becomes:
---   using (household_id = (auth.jwt() -> 'app_metadata' ->> 'household_id')::uuid)
--- and nothing else in the app changes — household_id is already on every row.
+-- When a second household is ever added, is_household() becomes a household_id
+-- comparison and nothing else changes — household_id is already on every row.
 
 -- ------------------------------------------------------------ photo storage
 
@@ -38,14 +45,14 @@ on conflict (id) do nothing;
 drop policy if exists photos_read on storage.objects;
 create policy photos_read on storage.objects
   for select to authenticated
-  using (bucket_id = 'photos');
+  using (bucket_id = 'photos' and is_household());
 
 drop policy if exists photos_write on storage.objects;
 create policy photos_write on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'photos');
+  with check (bucket_id = 'photos' and is_household());
 
 drop policy if exists photos_update on storage.objects;
 create policy photos_update on storage.objects
   for update to authenticated
-  using (bucket_id = 'photos');
+  using (bucket_id = 'photos' and is_household());

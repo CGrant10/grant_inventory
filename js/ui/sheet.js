@@ -1,7 +1,7 @@
 // Bottom sheet. The app's one modal primitive — add/edit forms, pickers, and
 // confirmations all use it, so there's a single dismissal and focus behaviour.
 
-import { el } from './dom.js';
+import { el, removeAfterExit } from './dom.js';
 
 let openSheet = null;
 
@@ -57,7 +57,8 @@ export function close() {
   document.removeEventListener('keydown', onKey);
   scrim.classList.add('is-out');
   panel.classList.add('is-out');
-  panel.addEventListener('animationend', () => { scrim.remove(); panel.remove(); }, { once: true });
+  removeAfterExit(scrim);
+  removeAfterExit(panel);
 }
 
 function onKey(e) {

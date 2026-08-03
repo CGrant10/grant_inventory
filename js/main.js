@@ -8,6 +8,7 @@ import * as sync from './core/sync.js';
 import * as idb from './core/idb.js';
 import { on, EVENTS } from './core/bus.js';
 import { errorToast } from './ui/toast.js';
+import { mountInstall } from './ui/install.js';
 
 const gate = document.getElementById('gate');
 const app = document.getElementById('app');
@@ -79,6 +80,7 @@ function showGate() {
   const offlineBtn = document.getElementById('gate-offline');
 
   nameEl.value = auth.device().name === 'Me' ? '' : auth.device().name;
+  mountInstall(document.getElementById('gate-install'), { className: 'btn btn-block' });
 
   if (!isConfigured()) {
     passEl.hidden = true;

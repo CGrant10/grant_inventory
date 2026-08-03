@@ -46,6 +46,24 @@ export const ICONS = {
   search:  '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
 };
 
+/**
+ * Remove a node once its exit animation finishes, with a timer as backstop.
+ *
+ * animationend is not guaranteed: a background tab, a browser that skips the
+ * animation, or a display:none ancestor all swallow it, and a modal that never
+ * tears down leaves the app unusable. The timer makes removal unconditional.
+ */
+export function removeAfterExit(node, fallbackMs = 400) {
+  let done = false;
+  const remove = () => {
+    if (done) return;
+    done = true;
+    node.remove();
+  };
+  node.addEventListener('animationend', remove, { once: true });
+  setTimeout(remove, fallbackMs);
+}
+
 export function fragment(children) {
   const frag = document.createDocumentFragment();
   for (const c of [].concat(children)) if (c) frag.append(c);

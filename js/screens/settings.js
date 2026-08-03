@@ -6,6 +6,19 @@ import * as idb from '../core/idb.js';
 import { toast, errorToast } from '../ui/toast.js';
 import { confirmSheet } from '../ui/sheet.js';
 import { go } from '../core/router.js';
+import { mountInstall } from '../ui/install.js';
+import { isInstalled as installed, mode as installMode } from '../core/install.js';
+
+const INSTALL_LABEL = {
+  installed:   'Installed app',
+  prompt:      'Browser tab',
+  menu:        'Browser tab',
+  ios:         'Browser tab',
+  unavailable: 'Browser tab',
+};
+
+// Anything not installed is a browser tab, so an unmapped mode still reads right.
+const installLabel = () => INSTALL_LABEL[installMode()] ?? 'Browser tab';
 
 export default async function settings() {
   const dev = auth.device();
@@ -22,9 +35,23 @@ export default async function settings() {
     placeholder: 'anon public key', autocapitalize: 'off', spellcheck: false,
   });
 
+  const installSlot = el('div', { class: 'stack-sm' });
+  mountInstall(installSlot, { className: 'btn btn-primary btn-block' });
+
   return el('div', { class: 'stack' }, [
+    installed() ? null : el('div', {}, [
+      el('div', { class: 'section-title', text: 'Install' }),
+      el('div', { class: 'card stack-sm' }, [
+        el('p', { class: 'help', text:
+          'Installing puts it on your home screen and runs it full screen, without ' +
+          'the browser bars. It works offline either way.' }),
+        installSlot,
+      ]),
+    ]),
+
     el('div', { class: 'section-title', text: 'This device' }),
     el('div', { class: 'card stack-sm' }, [
+      kv('Running as', installLabel()),
       el('label', { class: 'field-label', text: 'Name shown in history' }),
       nameField,
       el('button', {
