@@ -216,8 +216,26 @@ function wireUpdateBar() {
 
 /* ---- Service worker ---- */
 
+/**
+ * A freshly activated worker controls this page, but the page is still running
+ * the previous build's modules until it reloads — which is how a phone keeps
+ * showing screens that no longer exist in the source. Reload once, guarded by a
+ * session flag so a misbehaving worker cannot put us in a reload loop.
+ */
+function listenForWorkerUpdates() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.type !== 'sw-updated') return;
+    if (sessionStorage.getItem('gi.reloadedFor') === event.data.version) return;
+    sessionStorage.setItem('gi.reloadedFor', event.data.version);
+    console.info('[app] new build activated, reloading once');
+    location.reload();
+  });
+}
+
 async function registerSW() {
   if (!('serviceWorker' in navigator)) return;
+  listenForWorkerUpdates();
   try {
     const reg = await navigator.serviceWorker.register('sw.js');
     reg.addEventListener('updatefound', () => {

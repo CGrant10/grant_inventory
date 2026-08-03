@@ -1,7 +1,7 @@
 // Service worker. CACHE must be bumped in lockstep with VERSION in
 // js/core/config.js and version.txt, or phones keep serving the old build.
 
-const CACHE = 'grant-inventory-v0.7.1';
+const CACHE = 'grant-inventory-v0.7.3';
 
 // The shell. Everything needed to open the app with no network at all.
 const SHELL = [
@@ -67,8 +67,18 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const names = await caches.keys();
-    await Promise.all(names.filter(n => n !== CACHE).map(n => caches.delete(n)));
+    const replaced = names.filter(n => n !== CACHE);
+    await Promise.all(replaced.map(n => caches.delete(n)));
     await self.clients.claim();
+
+    // Claiming makes this worker control the open pages, but those pages are
+    // still running the OLD build's JavaScript until they reload. That is how a
+    // phone keeps showing a screen that no longer exists in the source. Tell
+    // them to reload once; the page guards against doing it more than once.
+    if (replaced.length) {
+      const clients = await self.clients.matchAll({ type: 'window' });
+      for (const client of clients) client.postMessage({ type: 'sw-updated', version: CACHE });
+    }
   })());
 });
 
