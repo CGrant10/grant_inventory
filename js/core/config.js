@@ -2,7 +2,7 @@
 //
 // VERSION must match version.txt and the cache string in sw.js. All three move
 // together on every commit or the in-app update check breaks.
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 
 // Supabase project. Leave blank to ship a local-only build — the app still works
 // on one phone and Settings offers a "Connect" form that stores these locally.

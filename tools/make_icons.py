@@ -1,50 +1,88 @@
-"""Generate the PWA icon set: a teal box glyph on a dark rounded square.
+"""Build every icon from the one source mark.
 
+Source: assets/logo-source.png — the Grant Household Inventory badge.
 Run after changing the mark:  python tools/make_icons.py
+
+Outputs
+  assets/logo.png                 badge cropped to its circle, transparent outside
+  assets/icons/icon-{192,512}.png rounded square, cream field
+  assets/icons/icon-*-maskable    full bleed, badge inside the 80% safe zone
+  assets/icons/apple-touch-icon   180px square (iOS applies its own mask)
+  assets/icons/favicon-{32,64}    browser tab
 """
+
 from PIL import Image, ImageDraw
 
-BG     = (15, 20, 23)
-ACCENT = (47, 214, 164)
-OUT    = "assets/icons"
+SRC = "assets/logo-source.png"
+OUT = "assets/icons"
+CREAM = (247, 244, 239, 255)
 
 
-def draw(size, maskable=False):
-    s = size * 4  # supersample, then downscale for clean edges
-    img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
+def circle_crop(path):
+    """Crop the badge to its outer ring and knock out everything beyond it."""
+    img = Image.open(path).convert("RGBA")
 
-    if maskable:
-        # Maskable icons get cropped to a circle by the launcher: fill edge to
-        # edge and keep the glyph inside the 80% safe zone.
-        d.rectangle([0, 0, s, s], fill=BG)
-        scale = 0.52
-    else:
-        d.rounded_rectangle([0, 0, s, s], radius=int(s * 0.22), fill=BG)
-        scale = 0.62
+    # The ring is the darkest thing in the frame, so its bbox is the badge's bbox.
+    mask = img.convert("L").point(lambda v: 255 if v < 200 else 0)
+    box = mask.getbbox()
+    if box is None:
+        raise SystemExit(f"no mark found in {path}")
 
-    # An open-topped crate seen from the front, with a fill line across it.
-    w = s * scale
-    h = w * 0.80
-    x0, y0 = (s - w) / 2, (s - h) / 2 + s * 0.02
-    x1, y1 = x0 + w, y0 + h
-    lw = max(2, int(s * 0.038))
+    x0, y0, x1, y1 = box
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    # A hair outside the ring, so antialiasing on the stroke isn't clipped flat.
+    r = min(x1 - x0, y1 - y0) / 2 * 1.01
+    img = img.crop((round(cx - r), round(cy - r), round(cx + r), round(cy + r)))
 
-    d.rounded_rectangle([x0, y0, x1, y1], radius=int(w * 0.10),
-                        outline=ACCENT, width=lw)
-    # Lid line and the "how full is it" band.
-    d.line([x0, y0 + h * 0.28, x1, y0 + h * 0.28], fill=ACCENT, width=lw)
-    d.rectangle([x0 + lw * 1.4, y0 + h * 0.52, x1 - lw * 1.4, y1 - lw * 1.4],
-                fill=ACCENT)
-    # Handle notch on the lid.
-    d.line([s / 2 - w * 0.11, y0, s / 2 + w * 0.11, y0], fill=BG, width=int(lw * 2.2))
+    w, h = img.size
+    ss = 4
+    alpha = Image.new("L", (w * ss, h * ss), 0)
+    ImageDraw.Draw(alpha).ellipse([0, 0, w * ss, h * ss], fill=255)
+    img.putalpha(alpha.resize((w, h), Image.LANCZOS))
+    return img
 
-    return img.resize((size, size), Image.LANCZOS)
 
+def fit(badge, size, scale):
+    """Badge centred on a transparent square of `size`, occupying `scale` of it."""
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = round(size * scale)
+    canvas.alpha_composite(badge.resize((d, d), Image.LANCZOS),
+                           ((size - d) // 2, (size - d) // 2))
+    return canvas
+
+
+def rounded(size, scale, badge):
+    """Any-purpose icon: cream rounded square with the badge inset."""
+    ss = 4
+    s = size * ss
+    field = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    ImageDraw.Draw(field).rounded_rectangle([0, 0, s, s], radius=int(s * 0.22), fill=CREAM)
+    field.alpha_composite(fit(badge, s, scale))
+    return field.resize((size, size), Image.LANCZOS)
+
+
+def maskable(size, badge):
+    """Launchers crop maskable icons to a circle — fill the frame, inset the mark."""
+    ss = 4
+    s = size * ss
+    field = Image.new("RGBA", (s, s), CREAM)
+    field.alpha_composite(fit(badge, s, 0.78))
+    return field.resize((size, size), Image.LANCZOS)
+
+
+badge = circle_crop(SRC)
+badge.resize((512, 512), Image.LANCZOS).save("assets/logo.png")
 
 for size in (192, 512):
-    draw(size).save(f"{OUT}/icon-{size}.png")
-    draw(size, maskable=True).save(f"{OUT}/icon-{size}-maskable.png")
+    rounded(size, 0.94, badge).save(f"{OUT}/icon-{size}.png")
+    maskable(size, badge).save(f"{OUT}/icon-{size}-maskable.png")
 
-draw(180).save(f"{OUT}/apple-touch-icon.png")
-print("icons written to", OUT)
+# iOS masks apple-touch-icon itself, so hand it a full-bleed square.
+field = Image.new("RGBA", (180, 180), CREAM)
+field.alpha_composite(fit(badge, 180, 0.96))
+field.save(f"{OUT}/apple-touch-icon.png")
+
+for size in (32, 64):
+    rounded(size, 0.98, badge).save(f"{OUT}/favicon-{size}.png")
+
+print("icons written from", SRC)

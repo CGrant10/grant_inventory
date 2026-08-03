@@ -1,7 +1,7 @@
 // Service worker. CACHE must be bumped in lockstep with VERSION in
 // js/core/config.js and version.txt, or phones keep serving the old build.
 
-const CACHE = 'grant-inventory-v0.1.0';
+const CACHE = 'grant-inventory-v0.2.0';
 
 // The shell. Everything needed to open the app with no network at all.
 const SHELL = [
@@ -30,8 +30,12 @@ const SHELL = [
   'js/screens/home-info.js',
   'js/screens/settings.js',
   'js/screens/placeholder.js',
+  'assets/logo.png',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png',
+  'assets/icons/favicon-32.png',
+  'assets/icons/favicon-64.png',
+  'assets/icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', event => {

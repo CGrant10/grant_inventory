@@ -1,4 +1,4 @@
-# Home Inventory
+# Grant Household Inventory
 
 A mobile-first PWA for knowing what the household has, how much, where it's stored,
 what's running low, and what to buy — plus measurements and project plans for the house.
@@ -41,6 +41,13 @@ Serve the folder over HTTP — service workers and ES modules will not run from 
 ```bash
 python -m http.server 8080
 ```
+
+## Branding
+
+The badge in `assets/logo-source.png` is the single source for every icon —
+`python tools/make_icons.py` regenerates the whole set plus `assets/logo.png`.
+The palette in `css/tokens.css` is sampled from it: cream `#faf5f0`, ink `#31312a`,
+tan `#ad987e`.
 
 ## Versioning
 
