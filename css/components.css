@@ -156,6 +156,32 @@
 .badge-info   { background: var(--info-soft);   color: var(--info); }
 .badge-ok     { background: var(--accent-soft); color: var(--accent); }
 
+/* ---- Update bar ---- */
+
+.update-bar {
+  position: sticky;
+  top: calc(var(--topbar-h) + var(--safe-top));
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background-color: var(--accent-soft);
+  border-bottom: 1px solid var(--line);
+}
+.update-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--accent);
+}
+.update-btn {
+  min-height: 38px;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-sm);
+}
+
 /* ---- Numbered steps (install instructions) ---- */
 
 .steps {

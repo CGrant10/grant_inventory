@@ -5,6 +5,7 @@ import { VERSION, isConfigured } from './core/config.js';
 import * as auth from './core/auth.js';
 import * as router from './core/router.js';
 import * as sync from './core/sync.js';
+import * as updates from './core/updates.js';
 import * as idb from './core/idb.js';
 import { on, EVENTS } from './core/bus.js';
 import { errorToast } from './ui/toast.js';
@@ -174,7 +175,29 @@ async function startApp() {
   on(EVENTS.SYNC_STATE, state => { syncDot.dataset.state = state; });
   on(EVENTS.DATA_CHANGED, () => router.refresh());
 
+  wireUpdateBar();
   sync.start();
+  updates.start();
+}
+
+function wireUpdateBar() {
+  const bar = document.getElementById('update-bar');
+  const text = document.getElementById('update-text');
+  const button = document.getElementById('update-btn');
+
+  const render = version => {
+    bar.hidden = !version;
+    if (version) text.textContent = `Version ${version} is ready`;
+  };
+
+  button.onclick = async () => {
+    button.disabled = true;
+    button.textContent = 'Updating…';
+    await updates.apply();
+  };
+
+  updates.onChange(render);
+  render(updates.pending());
 }
 
 /* ---- Service worker ---- */
@@ -201,7 +224,16 @@ window.addEventListener('unhandledrejection', e => {
   errorToast(e.reason?.message || 'Something went wrong');
 });
 
+/** Drop the ?v= cache-buster an update leaves behind, without another navigation. */
+function tidyUrl() {
+  if (!location.search.includes('v=')) return;
+  const url = new URL(location.href);
+  url.searchParams.delete('v');
+  history.replaceState(null, '', url.pathname + url.search + url.hash);
+}
+
 (async function boot() {
+  tidyUrl();
   await registerSW();
   if (auth.isUnlocked()) await startApp();
   else showGate();

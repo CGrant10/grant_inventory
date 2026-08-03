@@ -57,6 +57,10 @@ Three things move together on every commit, or phones keep serving the old build
 - `CACHE` in `sw.js`
 - `version.txt`
 
+`version.txt` is what the in-app update button compares against. If it lags behind
+`VERSION` the button never appears; if it runs ahead, the banner never clears. They
+must be identical strings.
+
 ## Status
 
 Phase 1 (foundation) is in place: app shell, service worker, design tokens, router,

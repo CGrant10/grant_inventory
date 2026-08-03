@@ -8,6 +8,7 @@ import { confirmSheet } from '../ui/sheet.js';
 import { go } from '../core/router.js';
 import { mountInstall } from '../ui/install.js';
 import { isInstalled as installed, mode as installMode } from '../core/install.js';
+import * as updates from '../core/updates.js';
 
 const INSTALL_LABEL = {
   installed:   'Installed app',
@@ -37,6 +38,13 @@ export default async function settings() {
 
   const installSlot = el('div', { class: 'stack-sm' });
   mountInstall(installSlot, { className: 'btn btn-primary btn-block' });
+
+  const waiting = updates.pending();
+  const updateStatus = el('p', {
+    class: 'help',
+    text: waiting ? `Version ${waiting} is ready to install.` : 'Checked when the app opens.',
+  });
+  const setStatus = message => { updateStatus.textContent = message; };
 
   return el('div', { class: 'stack' }, [
     installed() ? null : el('div', {}, [
@@ -149,7 +157,47 @@ export default async function settings() {
       }),
     ]),
 
-    el('p', { class: 'version', text: `Version ${VERSION}` }),
+    el('div', { class: 'section-title', text: 'App version' }),
+    el('div', { class: 'card stack-sm' }, [
+      kv('Installed', VERSION),
+      updateStatus,
+      el('button', {
+        class: 'btn btn-block',
+        text: 'Check for updates',
+        onclick: async function () {
+          this.disabled = true;
+          const before = this.textContent;
+          this.textContent = 'Checking…';
+          const result = await updates.check(true);
+          this.disabled = false;
+          this.textContent = before;
+
+          if (result.status === 'update') {
+            setStatus(`Version ${result.version} is ready — use the bar at the top.`);
+            toast(`Version ${result.version} is ready`);
+          } else if (result.status === 'offline') {
+            setStatus('Offline — cannot check right now.');
+          } else if (result.status === 'error') {
+            setStatus(`Could not check: ${result.message}`);
+          } else {
+            setStatus('You are on the latest version.');
+            toast('Already up to date');
+          }
+        },
+      }),
+      el('button', {
+        class: 'btn btn-block',
+        text: 'Force reinstall this version',
+        onclick: async () => {
+          const ok = await confirmSheet({
+            title: 'Reinstall the app files?',
+            message: 'Clears the cached copy and re-downloads it. Your data is untouched.',
+            confirmLabel: 'Reinstall',
+          });
+          if (ok) await updates.apply();
+        },
+      }),
+    ]),
   ]);
 }
 

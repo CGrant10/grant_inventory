@@ -28,4 +28,5 @@ export const EVENTS = {
   SYNC_STATE:      'sync:state',      // 'synced' | 'syncing' | 'offline' | 'error' | 'local'
   AUTH_CHANGED:    'auth:changed',
   INSTALL_CHANGED: 'install:changed',
+  UPDATE_STATE:    'update:state',    // newer version string, or null
 };
