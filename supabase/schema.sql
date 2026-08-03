@@ -1,0 +1,332 @@
+-- Grant Inventory — schema
+-- Paste into Supabase → SQL Editor → Run. Safe to re-run.
+--
+-- Conventions every table follows, because the sync engine depends on them:
+--   id           uuid, generated on the client so writes are idempotent
+--   household_id scopes every row; today there is one, tomorrow there may be more
+--   updated_at   maintained by trigger; the pull cursor reads it
+--   deleted_at   soft delete, so other phones learn about deletions on next pull
+
+create extension if not exists "pgcrypto";
+
+-- ---------------------------------------------------------------- households
+
+create table if not exists households (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null default 'Our House',
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  deleted_at  timestamptz
+);
+
+-- The one household. Every other table defaults household_id to this row, so the
+-- client never has to think about it.
+insert into households (id, name)
+values ('00000000-0000-0000-0000-000000000001', 'Our House')
+on conflict (id) do nothing;
+
+create or replace function default_household() returns uuid
+language sql immutable as $$ select '00000000-0000-0000-0000-000000000001'::uuid $$;
+
+-- Shorthand for the columns every table repeats.
+create or replace function touch_updated_at() returns trigger
+language plpgsql as $$
+begin
+  new.updated_at := now();
+  return new;
+end $$;
+
+-- ------------------------------------------------------------------- members
+
+create table if not exists members (
+  id            uuid primary key,               -- the device id
+  household_id  uuid not null default default_household() references households(id),
+  display_name  text not null,
+  color         text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  deleted_at    timestamptz
+);
+
+-- ---------------------------------------------------------------- categories
+
+create table if not exists categories (
+  id            uuid primary key default gen_random_uuid(),
+  household_id  uuid not null default default_household() references households(id),
+  name          text not null,
+  icon          text,
+  color         text,
+  sort_order    int not null default 0,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  deleted_at    timestamptz
+);
+
+-- ----------------------------------------------------------------- locations
+-- A tree: Kitchen > Pantry > Shelf 2 > Bin A. qr_slug is what a printed label
+-- encodes, so scanning it opens straight to this node's contents.
+
+create table if not exists locations (
+  id            uuid primary key default gen_random_uuid(),
+  household_id  uuid not null default default_household() references households(id),
+  parent_id     uuid references locations(id) on delete set null,
+  name          text not null,
+  kind          text not null default 'other',
+  qr_slug       text unique,
+  notes         text,
+  sort_order    int not null default 0,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  deleted_at    timestamptz
+);
+
+create index if not exists locations_parent_idx on locations(parent_id);
+
+-- ------------------------------------------------------------------ products
+-- The catalog: what a barcode *means*. Distinct from how much you have, which
+-- lives in items. One product, many stock lots in many places.
+
+create table if not exists products (
+  id            uuid primary key default gen_random_uuid(),
+  household_id  uuid not null default default_household() references households(id),
+  barcode       text,
+  name          text not null,
+  brand         text,
+  default_unit  text not null default 'ea',
+  category_id   uuid references categories(id) on delete set null,
+  image_url     text,
+  source        text not null default 'manual',   -- 'manual' | 'off'
+  attributes    jsonb not null default '{}'::jsonb,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  deleted_at    timestamptz,
+  unique (household_id, barcode)
+);
+
+create index if not exists products_barcode_idx on products(barcode);
+
+-- --------------------------------------------------------------------- items
+-- A stock lot in a place. Quantity is maintained by the item_events trigger —
+-- clients send deltas, never absolutes, so concurrent offline edits can't collide.
+
+create table if not exists items (
+  id            uuid primary key default gen_random_uuid(),
+  household_id  uuid not null default default_household() references households(id),
+  product_id    uuid references products(id) on delete set null,
+  name          text not null,
+  category_id   uuid references categories(id) on delete set null,
+  location_id   uuid references locations(id) on delete set null,
+  quantity      numeric not null default 0,
+  unit          text not null default 'ea',
+  min_quantity  numeric,
+  expires_on    date,
+  notes         text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  deleted_at    timestamptz
+);
+
+create index if not exists items_location_idx on items(location_id);
+create index if not exists items_product_idx  on items(product_id);
+create index if not exists items_expires_idx  on items(expires_on) where deleted_at is null;
+
+-- --------------------------------------------------------------- item_events
+-- Append-only. The audit log, the undo trail, the analytics source, and the
+-- conflict-free way to change a quantity — all one table.
+
+create table if not exists item_events (
+  id               uuid primary key,
+  household_id     uuid not null default default_household() references households(id),
+  item_id          uuid not null references items(id) on delete cascade,
+  member_id        uuid,
+  type             text not null,          -- add|consume|restock|adjust|move|discard|expire
+  delta            numeric not null default 0,
+  from_location_id uuid references locations(id) on delete set null,
+  to_location_id   uuid references locations(id) on delete set null,
+  note             text,
+  created_at       timestamptz not null default now()
+);
+
+create index if not exists item_events_item_idx    on item_events(item_id);
+create index if not exists item_events_created_idx on item_events(created_at);
+
+-- Applying the delta server-side is what makes offline edits commutative: two
+-- phones each consuming one, with no connection, still land on quantity - 2.
+create or replace function apply_item_event() returns trigger
+language plpgsql as $$
+begin
+  if new.delta <> 0 then
+    update items
+       set quantity   = greatest(0, quantity + new.delta),
+           updated_at = now()
+     where id = new.item_id;
+  end if;
+
+  if new.type = 'move' and new.to_location_id is not null then
+    update items
+       set location_id = new.to_location_id,
+           updated_at  = now()
+     where id = new.item_id;
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists item_events_apply on item_events;
+create trigger item_events_apply
+  after insert on item_events
+  for each row execute function apply_item_event();
+
+-- ----------------------------------------------------------- shopping_items
+
+create table if not exists shopping_items (
+  id             uuid primary key default gen_random_uuid(),
+  household_id   uuid not null default default_household() references households(id),
+  product_id     uuid references products(id) on delete set null,
+  item_id        uuid references items(id) on delete set null,
+  name           text not null,
+  quantity       numeric not null default 1,
+  unit           text not null default 'ea',
+  status         text not null default 'needed',   -- needed|in_cart|purchased
+  auto_generated boolean not null default false,
+  note           text,
+  purchased_at   timestamptz,
+  purchased_by   uuid,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  deleted_at     timestamptz
+);
+
+create index if not exists shopping_status_idx on shopping_items(status);
+
+-- -------------------------------------------------------------- measurements
+
+create table if not exists measurements (
+  id            uuid primary key default gen_random_uuid(),
+  household_id  uuid not null default default_household() references households(id),
+  location_id   uuid references locations(id) on delete set null,
+  name          text not null,
+  subject_kind  text not null default 'other',  -- room|window|door|cabinet|appliance|furniture|other
+  notes         text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  deleted_at    timestamptz
+);
+
+-- Arbitrary dimension sets: "Width 36 in", "Rough opening height 82.5 in".
+create table if not exists measurement_dims (
+  id              uuid primary key default gen_random_uuid(),
+  household_id    uuid not null default default_household() references households(id),
+  measurement_id  uuid not null references measurements(id) on delete cascade,
+  label           text not null,
+  value           numeric not null,
+  unit            text not null default 'in',
+  sort_order      int not null default 0,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now(),
+  deleted_at      timestamptz
+);
+
+create index if not exists dims_measurement_idx on measurement_dims(measurement_id);
+
+-- ------------------------------------------------------------------ projects
+
+create table if not exists projects (
+  id            uuid primary key default gen_random_uuid(),
+  household_id  uuid not null default default_household() references households(id),
+  title         text not null,
+  status        text not null default 'idea',   -- idea|planned|active|blocked|done
+  priority      int not null default 0,
+  description   text,
+  est_cost      numeric,
+  actual_cost   numeric,
+  target_date   date,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  deleted_at    timestamptz
+);
+
+create table if not exists project_lines (
+  id              uuid primary key default gen_random_uuid(),
+  household_id    uuid not null default default_household() references households(id),
+  project_id      uuid not null references projects(id) on delete cascade,
+  kind            text not null default 'material',   -- material|tool|task
+  name            text not null,
+  quantity        numeric not null default 1,
+  unit            text not null default 'ea',
+  est_cost        numeric,
+  done            boolean not null default false,
+  item_id         uuid references items(id) on delete set null,
+  measurement_id  uuid references measurements(id) on delete set null,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now(),
+  deleted_at      timestamptz
+);
+
+create index if not exists project_lines_project_idx on project_lines(project_id);
+
+-- --------------------------------------------------------------- attachments
+-- One photo table for every entity. Warranties, receipts and appliance plates
+-- land here later without a migration.
+
+create table if not exists attachments (
+  id            uuid primary key default gen_random_uuid(),
+  household_id  uuid not null default default_household() references households(id),
+  entity_type   text not null,          -- item|location|measurement|project|product
+  entity_id     uuid not null,
+  storage_path  text not null,
+  kind          text not null default 'photo',
+  width         int,
+  height        int,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  deleted_at    timestamptz
+);
+
+create index if not exists attachments_entity_idx on attachments(entity_type, entity_id);
+
+-- ------------------------------------------------------- updated_at triggers
+
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'households','members','categories','locations','products','items',
+    'shopping_items','measurements','measurement_dims','projects',
+    'project_lines','attachments'
+  ] loop
+    execute format('drop trigger if exists %I_touch on %I', t, t);
+    execute format(
+      'create trigger %I_touch before update on %I
+         for each row execute function touch_updated_at()', t, t);
+  end loop;
+end $$;
+
+-- ---------------------------------------------------------------- read views
+
+create or replace view v_location_path as
+  with recursive tree as (
+    select id, name, parent_id, name::text as path
+      from locations where parent_id is null and deleted_at is null
+    union all
+    select l.id, l.name, l.parent_id, tree.path || ' › ' || l.name
+      from locations l join tree on l.parent_id = tree.id
+     where l.deleted_at is null
+  )
+  select id, name, parent_id, path from tree;
+
+create or replace view v_low_stock as
+  select i.*, p.path as location_path
+    from items i
+    left join v_location_path p on p.id = i.location_id
+   where i.deleted_at is null
+     and i.min_quantity is not null
+     and i.quantity <= i.min_quantity;
+
+create or replace view v_expiring as
+  select i.*, p.path as location_path
+    from items i
+    left join v_location_path p on p.id = i.location_id
+   where i.deleted_at is null
+     and i.expires_on is not null
+     and i.expires_on <= current_date + interval '30 days';

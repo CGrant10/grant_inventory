@@ -1,0 +1,58 @@
+# Home Inventory
+
+A mobile-first PWA for knowing what the household has, how much, where it's stored,
+what's running low, and what to buy — plus measurements and project plans for the house.
+
+Static site on GitHub Pages, shared Postgres on Supabase, no build step, no paid services.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design.
+
+## Setup
+
+### 1. Supabase
+
+1. Create a free project at supabase.com.
+2. **SQL Editor** → run `supabase/schema.sql`, then `supabase/policies.sql`,
+   then optionally `supabase/seed.sql`.
+3. **Authentication → Users → Add user**: email `household@grant-inventory.local`,
+   password = the household passphrase, and tick *Auto Confirm User*.
+4. **Project Settings → API**: copy the project URL and the `anon` public key.
+
+### 2. The app
+
+Put the URL and anon key into `js/core/config.js` (`BUILT_IN`) and commit, or paste
+them into Settings on each phone. Baking them in is easier for the household —
+they're safe to publish, because row-level security requires the passphrase.
+
+### 3. GitHub Pages
+
+**Settings → Pages → Source: Deploy from a branch → `main` / root.**
+The app lives at `https://cgrant10.github.io/grant_inventory/`.
+
+### 4. Install on a phone
+
+Open that URL, then *Add to Home Screen*. Enter your name and the household
+passphrase once; every phone that does the same sees the same data.
+
+## Local development
+
+Serve the folder over HTTP — service workers and ES modules will not run from `file://`:
+
+```bash
+python -m http.server 8080
+```
+
+## Versioning
+
+Three things move together on every commit, or phones keep serving the old build:
+
+- `VERSION` in `js/core/config.js`
+- `CACHE` in `sw.js`
+- `version.txt`
+
+## Status
+
+Phase 1 (foundation) is in place: app shell, service worker, design tokens, router,
+auth gate, IndexedDB mirror, sync engine, and the database schema.
+Phases 2–8 — places and QR labels, inventory, scanning, shopping, measurements,
+projects, polish — are laid out in the architecture doc.
