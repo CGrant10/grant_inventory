@@ -72,6 +72,12 @@
 .quick svg { color: var(--accent); flex: none; }
 .quick:active { background-color: var(--surface-2); }
 
+.name-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+.name-actions .btn { flex: 1; }
+
 /* ---- Rows with a leading icon ---- */
 
 .row-icon {

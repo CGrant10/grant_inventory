@@ -3,6 +3,9 @@
 
 import { el, icon, ICONS, empty } from '../ui/dom.js';
 import * as idb from '../core/idb.js';
+import * as auth from '../core/auth.js';
+import { toast } from '../ui/toast.js';
+import { refresh } from '../core/router.js';
 
 export default async function home() {
   const [items, locations, shopping] = await Promise.all([
@@ -11,13 +14,20 @@ export default async function home() {
     idb.all('shopping_items'),
   ]);
 
-  if (!items.length && !locations.length) return firstRun();
+  const nameCard = whoAreYou();
+
+  if (!items.length && !locations.length) {
+    const view = firstRun();
+    if (nameCard) view.prepend(nameCard);
+    return view;
+  }
 
   const low = items.filter(i => i.min_quantity != null && Number(i.quantity) <= Number(i.min_quantity));
   const soon = expiringSoon(items);
   const needed = shopping.filter(s => s.status === 'needed');
 
   return el('div', { class: 'stack' }, [
+    nameCard,
     el('div', { class: 'stat-grid' }, [
       stat('Items', items.length, '/inventory'),
       stat('Places', locations.length, '/locations'),
@@ -34,6 +44,52 @@ export default async function home() {
       quick('Add a place', ICONS.pin, '#/locations'),
       quick('Shopping list', ICONS.cart, '#/shopping'),
       quick('Measurements', ICONS.ruler, '#/measurements'),
+    ]),
+  ]);
+}
+
+/**
+ * Asked here rather than at a gate: the name is only a label for history, so
+ * blocking the whole app on it was never worth it. Dismissible, and always
+ * changeable later in Settings.
+ */
+function whoAreYou() {
+  if (auth.device().name !== 'Me') return null;
+  if (localStorage.getItem('gi.nameAsked') === 'skip') return null;
+
+  const field = el('input', {
+    class: 'field',
+    type: 'text',
+    placeholder: 'Your name',
+    autocomplete: 'name',
+  });
+
+  const save = async () => {
+    const name = field.value.trim();
+    if (!name) return;
+    auth.setDeviceName(name);
+    const { memberRepo } = await import('../data/members.js');
+    await memberRepo.upsertSelf(auth.device());   // re-renders via the data bus
+    toast(`Hi, ${name}`);
+  };
+
+  field.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+
+  return el('div', { class: 'card stack-sm' }, [
+    el('div', { class: 'row-title', text: 'Who’s using this phone?' }),
+    el('p', { class: 'help', text:
+      'Only used to label who added or used something. Change it any time in Settings.' }),
+    field,
+    el('div', { class: 'name-actions' }, [
+      el('button', {
+        class: 'btn btn-ghost',
+        text: 'Not now',
+        onclick: () => {
+          localStorage.setItem('gi.nameAsked', 'skip');
+          refresh();
+        },
+      }),
+      el('button', { class: 'btn btn-primary', text: 'Save', onclick: save }),
     ]),
   ]);
 }

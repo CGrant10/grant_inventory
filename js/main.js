@@ -247,6 +247,20 @@ function tidyUrl() {
 (async function boot() {
   tidyUrl();
   await registerSW();
-  if (auth.isUnlocked()) await startApp();
-  else showGate();
+
+  if (auth.isUnlocked()) return startApp();
+
+  // Open access has nothing to ask for, so don't ask. Walk straight into the
+  // app; the name is set later on the Settings page, or from the prompt on Home.
+  if (isConfigured() && !REQUIRE_PASSPHRASE) {
+    try {
+      await auth.unlockOpen(auth.device().name);
+    } catch (err) {
+      console.warn('[boot] could not join the shared database', err);
+      auth.unlockLocal(auth.device().name);
+    }
+    return startApp();
+  }
+
+  showGate();
 })();
