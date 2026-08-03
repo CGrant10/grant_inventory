@@ -89,21 +89,35 @@ export default async function settings() {
     el('div', { class: 'section-title', text: 'Supabase project' }),
     el('div', { class: 'card stack-sm' }, [
       el('p', { class: 'help', text:
-        'Paste the project URL and the anon public key from Supabase → Project Settings → API. ' +
-        'The anon key is safe to store here; row-level security is what protects the data.' }),
+        'Already set up for this household — you only need this to point the app at a ' +
+        'different Supabase project. Changing it signs this phone out.' }),
       el('label', { class: 'field-label', text: 'Project URL' }),
       urlField,
-      el('label', { class: 'field-label', text: 'Anon key' }),
+      el('label', { class: 'field-label', text: 'Publishable key' }),
       keyField,
       el('button', {
-        class: 'btn btn-primary btn-block',
+        class: 'btn btn-block',
         text: isConfigured() ? 'Update connection' : 'Connect',
-        onclick: () => {
-          if (!urlField.value.trim() || !keyField.value.trim()) {
-            return errorToast('Both the URL and the anon key are required.');
+        onclick: async () => {
+          const url = urlField.value.trim().replace(/\/+$/, '');
+          const key = keyField.value.trim();
+          if (!url || !key) return errorToast('Both the URL and the key are required.');
+
+          // Pressing this with the existing values used to sign the user out and
+          // dump them back at the gate for no reason. Only act on a real change.
+          if (url === b.url.replace(/\/+$/, '') && key === b.anonKey) {
+            return toast('Already connected to that project — nothing changed.');
           }
-          setBackend({ url: urlField.value, anonKey: keyField.value });
-          toast('Saved. Sign in with the household passphrase.');
+
+          const ok = await confirmSheet({
+            title: 'Point at a different project?',
+            message: 'This signs this phone out and reloads. Anything not yet synced stays queued on this phone.',
+            confirmLabel: 'Change project',
+            danger: true,
+          });
+          if (!ok) return;
+
+          setBackend({ url, anonKey: key });
           auth.lock();
           location.reload();
         },

@@ -1,7 +1,7 @@
 // Service worker. CACHE must be bumped in lockstep with VERSION in
 // js/core/config.js and version.txt, or phones keep serving the old build.
 
-const CACHE = 'grant-inventory-v0.4.0';
+const CACHE = 'grant-inventory-v0.4.2';
 
 // The shell. Everything needed to open the app with no network at all.
 const SHELL = [
@@ -44,9 +44,14 @@ const SHELL = [
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    // addAll is all-or-nothing; add individually so one stale path can't block install.
+    // Two things matter here:
+    //   cache: 'reload'  — bypass the browser's own HTTP cache, otherwise a
+    //                      "fresh" install can re-cache the build we're replacing
+    //   individual adds  — addAll is all-or-nothing, so one bad path would
+    //                      abort the whole install
     await Promise.all(SHELL.map(url =>
-      cache.add(url).catch(err => console.warn('[sw] skipped', url, err))
+      cache.add(new Request(url, { cache: 'reload' }))
+        .catch(err => console.warn('[sw] skipped', url, err))
     ));
     self.skipWaiting();
   })());

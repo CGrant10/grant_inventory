@@ -18,6 +18,33 @@
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/screens.css">
 
+<!-- Escape hatch: ?reset wipes the caches and the service worker, then reloads.
+     This lives inline, in the document, on purpose. The service worker fetches
+     navigations network-first, so this markup is always fresh — but the module
+     JS is served cache-first, so a stale bundle can't be relied on to contain
+     its own fix. Anything that ships in js/ is unreachable when js/ is the
+     thing that's stale. -->
+<script>
+  (function () {
+    if (!/[?&]reset\b/.test(location.search)) return;
+    document.documentElement.style.visibility = 'hidden';
+    var jobs = [];
+    if (window.caches) jobs.push(caches.keys().then(function (keys) {
+      return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+    }));
+    if (navigator.serviceWorker) jobs.push(
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        return Promise.all(regs.map(function (r) { return r.unregister(); }));
+      }));
+    Promise.all(jobs).catch(function () {}).then(function () {
+      var u = new URL(location.href);
+      u.searchParams.delete('reset');
+      u.searchParams.set('v', Date.now().toString(36));
+      location.replace(u.toString());
+    });
+  })();
+</script>
+
 <!-- Chrome fires beforeinstallprompt early, often before the module graph has
      finished loading. Stash it here so js/core/install.js can't miss it. -->
 <script>
