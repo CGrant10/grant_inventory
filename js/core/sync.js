@@ -58,18 +58,54 @@ export async function sync() {
 
 /* ---- Push ---- */
 
+const MAX_TRIES = 5;
+
 async function push() {
   const ops = await idb.outboxAll();
   if (!ops.length) return;
 
   // Batch consecutive upserts to the same table into one request.
   let batch = [];
+
   const flush = async () => {
     if (!batch.length) return;
     const table = batch[0].table;
-    await sb.upsert(table, batch.map(o => o.payload));
-    for (const op of batch) await idb.outboxDelete(op.id);
+    const sending = batch;
     batch = [];
+
+    // Collapse repeats before sending. PostgREST turns the array into a single
+    // INSERT ... ON CONFLICT DO UPDATE, and Postgres refuses to update the same
+    // row twice in one command — so a create followed by an edit of the same
+    // record, both still queued, would fail the request forever and wedge the
+    // whole outbox. Ops are in sequence order, so keeping the last payload per
+    // id is exactly what applying them one at a time would produce.
+    const latest = new Map();
+    for (const op of sending) latest.set(op.payload.id, op.payload);
+
+    try {
+      await sb.upsert(table, [...latest.values()]);
+      for (const op of sending) await idb.outboxDelete(op.id);
+    } catch (err) {
+      // One bad row must not block every later write. Count attempts, and give
+      // up on an op that will clearly never succeed — parked in _meta so it can
+      // be inspected rather than vanishing.
+      const dead = [];
+      for (const op of sending) {
+        const tries = (op.tries || 0) + 1;
+        if (tries >= MAX_TRIES) {
+          dead.push({ table, payload: op.payload, error: err.message });
+          await idb.outboxDelete(op.id);
+        } else {
+          await idb.outboxAdd({ ...op, tries });
+        }
+      }
+      if (dead.length) {
+        const parked = await idb.meta('failed_ops', []);
+        await idb.setMeta('failed_ops', [...parked, ...dead].slice(-50));
+        console.error(`[sync] gave up on ${dead.length} write(s) to ${table}`, err);
+      }
+      throw err;
+    }
   };
 
   for (const op of ops) {

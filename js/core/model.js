@@ -66,3 +66,30 @@ export function uuid() {
 export function nowIso() {
   return new Date().toISOString();
 }
+
+/**
+ * A URL-safe slug with random entropy appended.
+ *
+ * locations.qr_slug is UNIQUE, and upserts merge on the primary key, not on the
+ * slug — so two phones that each create a "Pantry Shelf 2" while offline would
+ * generate the same slug and one of them could never push. The suffix makes a
+ * collision effectively impossible. Nobody types these; they live inside QR
+ * codes, so readability only has to survive a glance at a printed label.
+ */
+export function slug(text, entropy = 4) {
+  const base = String(text || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 40)
+    .replace(/^-|-$/g, '') || 'place';
+
+  const alphabet = 'abcdefghijkmnpqrstuvwxyz23456789';   // no l/o/0/1 — misread on paper
+  const bytes = crypto.getRandomValues(new Uint8Array(entropy));
+  const tail = [...bytes].map(b => alphabet[b % alphabet.length]).join('');
+
+  return `${base}-${tail}`;
+}
