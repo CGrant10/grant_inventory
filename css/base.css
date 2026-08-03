@@ -48,7 +48,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { background: none; border: 0; cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 
-svg {
+/* Icon styling is scoped to .ico, never to bare `svg`. A global `svg { ... }`
+   also hits generated graphics. It turned every QR code into a blob: the module
+   path carries fill="#000" but no stroke attribute, so it inherited
+   `stroke: currentColor; stroke-width: 1.9`. Stroke width is in viewBox units
+   and each module is 1 unit, so every square grew a 1.9-unit outline and they
+   all merged — black on the print label, where the colour is #111. */
+.ico {
   width: 24px; height: 24px;
   fill: none;
   stroke: currentColor;

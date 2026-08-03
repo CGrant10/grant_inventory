@@ -25,6 +25,7 @@ export function el(tag, props = {}, children = []) {
 /** Inline SVG from a path string. Icon markup is authored here, never user input. */
 export function icon(paths, size = 24) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'ico');
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('width', size);
   svg.setAttribute('height', size);

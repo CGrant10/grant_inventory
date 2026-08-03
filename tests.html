@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grant Inventory — tests</title>
+<!-- The app's own stylesheets, on purpose: a QR can be encoded perfectly and
+     still render as a solid block because of a stray global rule. Testing the
+     encoder without the CSS misses exactly that class of bug. -->
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/screens.css">
 <style>
   body { font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
          margin: 0; padding: 24px; background: #14150f; color: #eee; }
@@ -261,6 +268,73 @@ group('Slugs');
   ok('empty name still yields a slug', slug('').length > 4, slug(''));
   ok('no confusable characters in the suffix',
      Array.from({ length: 200 }, () => slug('x').split('-').pop()).every(s => !/[lo01]/.test(s)));
+}
+
+/* ---------------------------------------------------------------- Rendering
+   Encoding correctly is not enough — a QR can be perfect and still paint as a
+   blob because of a stray stylesheet rule.
+
+   The computed-style checks are the real guard here. A global `svg { stroke:
+   currentColor; stroke-width: 1.9 }` gave every 1-unit module a 1.9-unit
+   outline and merged the whole code into a block; asserting the path ends up
+   unstroked catches exactly that.
+
+   The pixel count below is a weaker check by nature: rasterising a serialised
+   SVG through an <img> deliberately drops page CSS, so it validates the
+   encoder-to-SVG path but is blind to stylesheet damage. Both are kept — they
+   fail for different reasons. */
+
+group('Rendering');
+{
+  const { qrElement } = await import('./js/ui/qr.js');
+
+  const host = document.createElement('div');
+  host.style.cssText = 'position:absolute;left:-9999px;top:0';
+  document.body.append(host);
+
+  const wrap = qrElement('https://cgrant10.github.io/grant_inventory/#/l/fridge-rtceek',
+                         { size: 200, ecc: 'Q' });
+  host.append(wrap);
+
+  const svgEl = wrap.querySelector('svg');
+  const pathEl = svgEl.querySelector('path');
+  const cs = getComputedStyle(pathEl);
+
+  // This is the assertion that would have caught the blob.
+  ok('QR path is unstroked under the app stylesheets',
+     cs.stroke === 'none' || cs.strokeWidth === '0px',
+     `stroke ${cs.stroke}, width ${cs.strokeWidth}`);
+  ok('QR path fill is not "none"', cs.fill !== 'none', `fill ${cs.fill}`);
+
+  const svgText = new XMLSerializer().serializeToString(svgEl);
+  const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+
+  const side = 240;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = side;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, side, side);
+  URL.revokeObjectURL(url);
+  host.remove();
+
+  const { data } = ctx.getImageData(0, 0, side, side);
+  let dark = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if ((data[i] + data[i + 1] + data[i + 2]) / 3 < 128) dark++;
+  }
+  const ratio = dark / (side * side);
+
+  // A real QR lands near 50% once the quiet zone is included; a solid block is
+  // ~1.0 and a blank one ~0.
+  ok(`rendered QR is ${(ratio * 100).toFixed(1)}% dark, not a solid block`,
+     ratio > 0.2 && ratio < 0.65, `ratio ${ratio.toFixed(3)}`);
+
+  // Corners of the quiet zone must be light, which a blob would fail.
+  const px = (x, y) => { const i = (y * side + x) * 4; return (data[i] + data[i+1] + data[i+2]) / 3; };
+  ok('quiet zone is light', px(2, 2) > 200 && px(side - 3, 2) > 200 && px(2, side - 3) > 200,
+     `${px(2,2)}, ${px(side-3,2)}, ${px(2,side-3)}`);
 }
 
 /* ------------------------------------------------------------------ Summary */
