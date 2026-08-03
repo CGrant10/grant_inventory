@@ -2,14 +2,15 @@
 //
 // VERSION must match version.txt and the cache string in sw.js. All three move
 // together on every commit or the in-app update check breaks.
-export const VERSION = '0.2.0';
+export const VERSION = '0.2.1';
 
-// Supabase project. Leave blank to ship a local-only build — the app still works
-// on one phone and Settings offers a "Connect" form that stores these locally.
-// The anon key is public by design; row-level security is what protects the data.
+// Supabase project. The publishable key is public by design — it ships in every
+// client bundle. supabase/policies.sql is what protects the data: without the
+// household passphrase this key can read and write nothing.
+// Blank these to ship a local-only build; Settings also offers a Connect form.
 const BUILT_IN = {
-  url:     '',
-  anonKey: '',
+  url:     'https://sznkdnzgoepwkoddrvgg.supabase.co',
+  anonKey: 'sb_publishable_pvAFS7cCwXCRMSbm8C2U2Q_r_ai6YUP',
 };
 
 // The single household account. The "passphrase" is this account's password.
