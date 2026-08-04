@@ -11,6 +11,8 @@ import * as idb from './core/idb.js';
 import { on, EVENTS } from './core/bus.js';
 import { errorToast } from './ui/toast.js';
 import { mountInstall } from './ui/install.js';
+import { isOpen as isSheetOpen, onClose as onSheetClose } from './ui/sheet.js';
+import { mountPullToSync } from './ui/pull-to-sync.js';
 
 const gate = document.getElementById('gate');
 const app = document.getElementById('app');
@@ -206,19 +208,62 @@ async function startApp() {
   backBtn.onclick = () => router.back();
   document.getElementById('settings-btn').onclick = () => router.go('/settings');
 
-  on(EVENTS.SYNC_STATE, state => { syncDot.dataset.state = state; });
+  on(EVENTS.SYNC_STATE, state => {
+    syncDot.dataset.state = state;
+    // A second chance to pay off a deferred repaint. focusout is the quick path,
+    // but someone can leave a field focused indefinitely — and then the screen
+    // would sit stale until they navigated. This fires every sync cycle.
+    if (state === 'synced') flushRepaint();
+  });
   syncDot.onclick = () => showSyncStatus();
   // Only repaint for changes that arrived from another device. A local write
   // already updated whatever made it, and re-rendering mid-interaction would
   // replace the control under the user's finger — the stepper especially.
   on(EVENTS.DATA_CHANGED, detail => {
-    if (detail?.source === 'sync') router.refresh();
+    if (detail?.source === 'sync') refreshWhenIdle();
   });
+
+  document.addEventListener('focusout', flushRepaint);
+  onSheetClose(flushRepaint);
+  mountPullToSync(app, () => sync.sync());
 
   wireUpdateBar();
   sync.start();
   updates.start();
   photos.start();
+}
+
+/* ---- Repainting without interrupting anyone ---- */
+
+/**
+ * A sync fires every 45 seconds while the app is open, and every pull that
+ * touches a table asks the screen to repaint. Doing that while someone is typing
+ * in the inventory search box destroys what they typed and where the cursor was;
+ * doing it behind an open sheet pulls the record out from under the form.
+ *
+ * So a sync-driven repaint waits its turn. Nothing is lost by waiting: the data
+ * is already in IndexedDB, and the screen catches up the moment the person is
+ * no longer busy — or on the next sync, or the next navigation.
+ */
+let repaintPending = false;
+
+function busy() {
+  const focused = document.activeElement;
+  const typing = focused && /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName);
+  return Boolean(typing) || isSheetOpen();
+}
+
+function refreshWhenIdle() {
+  if (busy()) { repaintPending = true; return; }
+  repaintPending = false;
+  router.refresh();
+}
+
+/** Whenever a field is left or a sheet closes, take the repaint that was owed. */
+function flushRepaint() {
+  if (!repaintPending) return;
+  // One tick, so focus has actually settled before we ask whether it is busy.
+  setTimeout(() => { if (repaintPending && !busy()) refreshWhenIdle(); }, 0);
 }
 
 const SYNC_MEANING = {

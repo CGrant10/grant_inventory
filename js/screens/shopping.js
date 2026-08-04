@@ -7,24 +7,40 @@ import { reconcile } from '../features/low-stock.js';
 import { fmtQty } from '../data/items.js';
 import { sheet, close, confirmSheet } from '../ui/sheet.js';
 import { toast, errorToast } from '../ui/toast.js';
-import { refresh } from '../core/router.js';
+import { flip } from '../ui/flip.js';
 import { UNITS } from '../core/model.js';
 
 export default async function shopping() {
   await reconcile();
-  const lines = await shoppingRepo.list();
 
+  // The screen owns a root it can repaint itself, rather than asking the router
+  // to rebuild the page. That is what makes the movement animatable: a tick
+  // moves one row between two sections, and the rest of the screen holds still.
+  const root = el('div', { class: 'stack' });
+
+  const repaint = async ({ animate = true } = {}) => {
+    const lines = await shoppingRepo.list();
+    const build = () => root.replaceChildren(...content(lines, repaint));
+    if (animate) flip(root, build);
+    else build();
+  };
+
+  await repaint({ animate: false });
+  return root;
+}
+
+function content(lines, repaint) {
   const needed = lines.filter(l => l.status === STATUS.NEEDED);
   const inCart = lines.filter(l => l.status === STATUS.IN_CART);
   const bought = lines.filter(l => l.status === STATUS.PURCHASED);
 
   const addButton = el('button', {
     class: 'btn btn-primary btn-block',
-    onclick: () => addForm(),
+    onclick: () => addForm(repaint),
   }, [icon(ICONS.plus, 20), el('span', { text: 'Add to the list' })]);
 
   if (!lines.length) {
-    return el('div', { class: 'stack' }, [
+    return [
       empty({
         glyph: ICONS.cart,
         title: 'Nothing to buy',
@@ -32,27 +48,27 @@ export default async function shopping() {
             + 'appear here on their own when they get low.',
       }),
       addButton,
-    ]);
+    ];
   }
 
-  return el('div', { class: 'stack' }, [
-    section(`To buy (${needed.length})`, needed, 'needed'),
-    inCart.length ? section(`In the cart (${inCart.length})`, inCart, 'cart') : null,
-    bought.length ? boughtSection(bought) : null,
+  return [
+    section(`To buy (${needed.length})`, needed, 'needed', repaint),
+    inCart.length ? section(`In the cart (${inCart.length})`, inCart, 'cart', repaint) : null,
+    bought.length ? boughtSection(bought, repaint) : null,
     addButton,
-  ]);
+  ].filter(Boolean);
 }
 
-function section(title, lines, kind) {
+function section(title, lines, kind, repaint) {
   return el('div', {}, [
     el('div', { class: 'section-title', text: title }),
     lines.length
-      ? el('div', { class: 'list' }, lines.map(line => row(line, kind)))
+      ? el('div', { class: 'list' }, lines.map(line => row(line, kind, repaint)))
       : el('p', { class: 'help pad', text: 'Nothing here.' }),
   ]);
 }
 
-function boughtSection(lines) {
+function boughtSection(lines, repaint) {
   return el('div', {}, [
     el('div', { class: 'section-title' }, [
       el('span', { text: `Bought (${lines.length})` }),
@@ -68,15 +84,15 @@ function boughtSection(lines) {
           if (!ok) return;
           const n = await shoppingRepo.clearPurchased();
           toast(`Cleared ${n}`);
-          refresh();
+          repaint();
         },
       }),
     ]),
-    el('div', { class: 'list' }, lines.map(line => row(line, 'bought'))),
+    el('div', { class: 'list' }, lines.map(line => row(line, 'bought', repaint))),
   ]);
 }
 
-function row(line, kind) {
+function row(line, kind, repaint) {
   const qty = `${fmtQty(line.quantity)} ${line.unit || ''}`.trim();
 
   // The primary tap: needed -> in the cart -> bought. One finger, no menus.
@@ -90,12 +106,14 @@ function row(line, kind) {
           ? `${line.name} → ${fmtQty(restocked.quantity)} ${restocked.unit || ''}`.trim()
           : `${line.name} bought`, {
           ms: 6000,
-          undo: async () => { await shoppingRepo.unpurchase(line.id); refresh(); },
+          undo: async () => { await shoppingRepo.unpurchase(line.id); repaint(); },
         });
       } else {
         await shoppingRepo.unpurchase(line.id);
       }
-      refresh();
+      // A tick is worth feeling as well as seeing.
+      if (navigator.vibrate) navigator.vibrate(8);
+      repaint();
     } catch (err) {
       errorToast(err.message);
     }
@@ -108,9 +126,14 @@ function row(line, kind) {
     onclick: advance,
   }, kind === 'needed' ? [] : [icon('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 20)]);
 
-  return el('div', { class: `row shop-row${kind === 'bought' ? ' is-done' : ''}` }, [
+  // The key the movement is tracked by: the row is rebuilt on every repaint, so
+  // identity has to come from the data, not from the element.
+  return el('div', {
+    class: `row shop-row${kind === 'bought' ? ' is-done' : ''}`,
+    dataset: { flipKey: line.id },
+  }, [
     box,
-    el('button', { class: 'row-main shop-main', onclick: () => editForm(line) }, [
+    el('button', { class: 'row-main shop-main', onclick: () => editForm(line, repaint) }, [
       el('div', { class: 'row-title', text: line.name }),
       el('div', { class: 'row-sub' }, [
         qty,
@@ -120,7 +143,7 @@ function row(line, kind) {
   ]);
 }
 
-function addForm() {
+function addForm(repaint) {
   const name = el('input', { class: 'field', type: 'text', placeholder: 'What do you need?', autocapitalize: 'sentences' });
   const qty = el('input', { class: 'field', type: 'number', inputmode: 'decimal', min: '0', step: 'any', value: '1' });
   const unit = el('select', { class: 'field' }, UNITS.map(u => el('option', { value: u, text: u })));
@@ -131,7 +154,7 @@ function addForm() {
     await shoppingRepo.add({ name: trimmed, quantity: Number(qty.value) || 1, unit: unit.value });
     close();
     toast(`Added ${trimmed}`);
-    refresh();
+    repaint();
   };
 
   name.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
@@ -149,7 +172,7 @@ function addForm() {
   });
 }
 
-function editForm(line) {
+function editForm(line, repaint) {
   const qty = el('input', {
     class: 'field', type: 'number', inputmode: 'decimal', min: '0', step: 'any',
     value: String(line.quantity),
@@ -158,7 +181,7 @@ function editForm(line) {
   const save = async () => {
     await shoppingRepo.setQuantity(line.id, Number(qty.value));
     close();
-    refresh();
+    repaint();
   };
 
   sheet({
@@ -180,7 +203,7 @@ function editForm(line) {
           await shoppingRepo.softDelete(line.id);
           close();
           toast(`Removed ${line.name}`);
-          refresh();
+          repaint();
         },
       }),
       el('button', { class: 'btn btn-primary btn-block', text: 'Save', onclick: save }),

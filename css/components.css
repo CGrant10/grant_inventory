@@ -324,3 +324,80 @@
 @keyframes sheet-down { to   { transform: translateY(100%); } }
 @keyframes fade-in    { from { opacity: 0; } }
 @keyframes fade-out   { to   { opacity: 0; } }
+
+/* ---- Screen entry ---- */
+
+/* A short rise on the incoming screen. Short on purpose: this plays on every
+   navigation, and anything longer than about 200ms stops reading as responsive
+   and starts reading as a wait. */
+.view.is-entering {
+  animation: view-in 190ms var(--ease) both;
+}
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---- Skeleton ---- */
+
+/* Only ever seen when a screen genuinely takes a moment — the router waits
+   150ms before showing it, so a warm navigation never flashes one. */
+.skeleton {
+  display: grid;
+  gap: var(--sp-2);
+  animation: skeleton-in 160ms var(--ease) both;
+}
+.skeleton-row {
+  height: 62px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(
+    100deg,
+    var(--surface) 30%,
+    var(--surface-2) 50%,
+    var(--surface) 70%
+  );
+  background-size: 220% 100%;
+  animation: skeleton-sweep 1.3s ease-in-out infinite;
+}
+.skeleton-row:nth-child(2) { opacity: .85; }
+.skeleton-row:nth-child(3) { opacity: .7; }
+.skeleton-row:nth-child(4) { opacity: .55; }
+.skeleton-row:nth-child(5) { opacity: .4; }
+
+@keyframes skeleton-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes skeleton-sweep {
+  from { background-position: 180% 0; }
+  to   { background-position: -80% 0; }
+}
+
+/* ---- Pull to sync ---- */
+
+.pull-badge {
+  position: fixed;
+  top: calc(var(--topbar-h) + var(--safe-top) - 6px);
+  left: 50%;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  width: 40px; height: 40px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-3);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  transform: translate(-50%, 0);
+  pointer-events: none;
+}
+/* Only the settle back to rest is animated. While a finger is on the glass the
+   badge must track it exactly — a transition there feels like lag, not polish. */
+.pull-badge.is-settling {
+  transition: transform var(--med) var(--ease), opacity var(--med) var(--ease);
+}
+.pull-badge svg { transition: transform var(--fast) linear; }
+.pull-badge.is-active svg { transition: none; }
+.pull-badge.is-ready { color: var(--accent); border-color: var(--accent); }
+.pull-badge.is-running svg { animation: pull-spin .9s linear infinite; }
+.pull-badge.is-done { color: var(--accent); border-color: var(--accent); }
+
+@keyframes pull-spin { to { transform: rotate(360deg); } }

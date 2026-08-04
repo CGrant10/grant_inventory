@@ -209,6 +209,24 @@ decisions worth keeping:
   worst case is an orphan blob wasting space — never a row pointing at a photo
   that does not exist, which is what other phones would see.
 
+**Never repaint under someone's hands.** Three rules, learned from the same bug:
+
+- A re-render is not a navigation. `router.refresh()` keeps the scroll position;
+  only a real navigation resets it. A background pull used to throw a reader
+  straight back to the top of the inventory every 45 seconds.
+- A sync-driven repaint waits while a field has focus or a sheet is open, and is
+  paid off on `focusout` or on the next completed sync. Nothing is lost by
+  waiting — the data is already in IndexedDB.
+- The outlet is never cleared before the next screen is ready. Clearing first and
+  then awaiting the module and its data means every tap shows an empty screen for
+  as long as that takes. A skeleton appears only after 150ms, so a warm
+  navigation never flashes one.
+
+Screens that change their own list in place — shopping is the one so far — own a
+root they repaint themselves rather than calling `router.refresh()`, which is what
+makes `ui/flip.js` possible: rows are matched across the rebuild by
+`data-flip-key` and animated from where they were to where they now are.
+
 The uploader rides on the sync engine's `synced` event rather than keeping a timer:
 if the network was good enough to sync, it is good enough to upload. Failures stay
 queued rather than being counted out — unlike a bad row, a photo that will not

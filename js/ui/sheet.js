@@ -4,6 +4,17 @@
 import { el, removeAfterExit } from './dom.js';
 
 let openSheet = null;
+const closeListeners = new Set();
+
+/** Is a modal on screen? Callers use this to avoid repainting underneath one. */
+export function isOpen() {
+  return Boolean(openSheet);
+}
+
+export function onClose(fn) {
+  closeListeners.add(fn);
+  return () => closeListeners.delete(fn);
+}
 
 export function sheet({ title, body, actions = [] } = {}) {
   close();
@@ -59,6 +70,10 @@ export function close() {
   panel.classList.add('is-out');
   removeAfterExit(scrim);
   removeAfterExit(panel);
+
+  for (const fn of closeListeners) {
+    try { fn(); } catch (err) { console.error('[sheet] close listener failed', err); }
+  }
 }
 
 function onKey(e) {
