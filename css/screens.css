@@ -198,6 +198,54 @@
 
 .pad { padding: var(--sp-4); }
 
+/* ---- Measurements ---- */
+
+.dim-rows { display: grid; gap: var(--sp-2); }
+.dim-row {
+  display: grid;
+  grid-template-columns: 1fr 90px var(--tap);
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+/* Read at arm's length in a shop, so the numbers are the largest thing here. */
+.dim-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: var(--sp-2);
+}
+.dim-cell {
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  text-align: center;
+}
+.dim-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.dim-value {
+  font-size: var(--fs-3xl);
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.dim-unit { font-size: var(--fs-xs); color: var(--text-3); }
+
+/* ---- Projects ---- */
+
+/* A conic gradient is enough for a progress dot — no SVG, no library. */
+.progress-ring {
+  flex: none;
+  width: 26px; height: 26px;
+  border-radius: var(--r-full);
+  background: conic-gradient(var(--accent) calc(var(--p, 0) * 1%), var(--surface-3) 0);
+}
+
 /* ---- Shopping list ---- */
 
 .shop-row { gap: var(--sp-3); }

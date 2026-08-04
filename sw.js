@@ -1,7 +1,7 @@
 // Service worker. CACHE must be bumped in lockstep with VERSION in
 // js/core/config.js and version.txt, or phones keep serving the old build.
 
-const CACHE = 'grant-inventory-v0.10.0';
+const CACHE = 'grant-inventory-v0.12.0';
 
 // The shell. Everything needed to open the app with no network at all.
 const SHELL = [
@@ -29,6 +29,13 @@ const SHELL = [
   'js/data/items.js',
   'js/data/products.js',
   'js/data/shopping.js',
+  'js/data/measurements.js',
+  'js/data/projects.js',
+  'js/screens/projects.js',
+  'js/screens/project.js',
+  'js/ui/measurement-form.js',
+  'js/screens/measurements.js',
+  'js/screens/measurement.js',
   'js/features/low-stock.js',
   'js/screens/shopping.js',
   'js/core/scanner.js',
@@ -53,7 +60,6 @@ const SHELL = [
   'js/screens/home.js',
   'js/screens/home-info.js',
   'js/screens/settings.js',
-  'js/screens/placeholder.js',
   'assets/logo.png',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png',

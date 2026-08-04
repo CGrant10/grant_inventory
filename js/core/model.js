@@ -53,6 +53,36 @@ export const UNITS = [
   'lb', 'oz', 'g', 'kg', 'gal', 'qt', 'L', 'mL', 'ft', 'in',
 ];
 
+export const MEASURE_UNITS = ['in', 'ft', 'cm', 'mm', 'm'];
+
+export const SUBJECT_KINDS = [
+  { id: 'room',      label: 'Room' },
+  { id: 'window',    label: 'Window' },
+  { id: 'door',      label: 'Door' },
+  { id: 'cabinet',   label: 'Cabinet' },
+  { id: 'appliance', label: 'Appliance' },
+  { id: 'furniture', label: 'Furniture' },
+  { id: 'other',     label: 'Other' },
+];
+
+// The dimensions people actually reach for, per kind of thing. Offered as a
+// starting set so a measurement is three numbers and a name, not a form.
+export const DIM_PRESETS = {
+  room:      ['Width', 'Length', 'Ceiling height'],
+  window:    ['Width', 'Height', 'Sill depth'],
+  door:      ['Width', 'Height', 'Jamb depth'],
+  cabinet:   ['Width', 'Height', 'Depth'],
+  appliance: ['Width', 'Height', 'Depth'],
+  furniture: ['Width', 'Height', 'Depth'],
+  other:     ['Width', 'Height'],
+};
+
+export const LINE_KINDS = [
+  { id: 'material', label: 'Material' },
+  { id: 'tool',     label: 'Tool' },
+  { id: 'task',     label: 'Task' },
+];
+
 export function uuid() {
   if (crypto.randomUUID) return crypto.randomUUID();
   // Older iOS Safari: build a v4 from getRandomValues.

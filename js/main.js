@@ -28,7 +28,9 @@ const TITLES = {
   '/shopping': 'Shopping',
   '/home-info': 'My House',
   '/measurements': 'Measurements',
+  '/measurement': 'Measurement',
   '/projects': 'Projects',
+  '/project': 'Project',
   '/settings': 'Settings',
   '/labels': 'QR labels',
   '/l': 'Place',
@@ -54,9 +56,11 @@ function defineRoutes() {
 
   router.define('/shopping', () => import('./screens/shopping.js'));
 
-  const later = () => import('./screens/placeholder.js');
-  router.define('/measurements',async () => ({ default: (await later()).measurements }));
-  router.define('/projects',    async () => ({ default: (await later()).projects }));
+  router.define('/measurements',   () => import('./screens/measurements.js'));
+  router.define('/measurement/:id',() => import('./screens/measurement.js'));
+
+  router.define('/projects',    () => import('./screens/projects.js'));
+  router.define('/project/:id', () => import('./screens/project.js'));
 }
 
 function onRouteChange({ path }) {
