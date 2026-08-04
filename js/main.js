@@ -7,6 +7,7 @@ import * as router from './core/router.js';
 import * as sync from './core/sync.js';
 import * as updates from './core/updates.js';
 import * as photos from './features/photos.js';
+import * as theme from './core/theme.js';
 import * as idb from './core/idb.js';
 import { on, EVENTS } from './core/bus.js';
 import { errorToast } from './ui/toast.js';
@@ -381,6 +382,9 @@ function tidyUrl() {
 
 (async function boot() {
   tidyUrl();
+  // The inline script in index.html has already set the attribute; this takes
+  // over keeping the browser chrome in step with it.
+  theme.start();
   await registerSW();
 
   if (auth.isUnlocked()) return startApp();

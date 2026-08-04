@@ -18,6 +18,23 @@
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/screens.css">
 
+<!-- Appearance, applied before the first paint.
+     This has to run here, inline and ahead of the body, rather than in js/core/
+     with the rest of it: a module is deferred until after the document has been
+     parsed and painted, so a phone set to Light with the app set to Dark would
+     show a full cream screen and then snap to charcoal on every cold start.
+     Reading one localStorage key is cheap enough to do twice. -->
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('gi.theme');
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.dataset.theme = saved;
+      }
+    } catch (e) { /* private mode: fall through to the system's choice */ }
+  })();
+</script>
+
 <!-- Escape hatch: ?reset wipes the caches and the service worker, then reloads.
      This lives inline, in the document, on purpose. The service worker fetches
      navigations network-first, so this markup is always fresh — but the module

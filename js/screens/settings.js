@@ -7,6 +7,8 @@ import { toast, errorToast } from '../ui/toast.js';
 import { confirmSheet } from '../ui/sheet.js';
 import { go, refresh } from '../core/router.js';
 import * as photos from '../features/photos.js';
+import * as theme from '../core/theme.js';
+import { THEMES } from '../core/theme.js';
 import { mountInstall } from '../ui/install.js';
 import { isInstalled as installed, mode as installMode } from '../core/install.js';
 import * as updates from '../core/updates.js';
@@ -115,6 +117,19 @@ export default async function settings() {
         text: 'Sync now',
         onclick: async () => { await sync.sync(); toast('Sync finished'); },
       }),
+    ]),
+
+    el('div', { class: 'section-title', text: 'Appearance' }),
+    el('div', { class: 'card stack-sm' }, [
+      el('div', { class: 'chip-row' }, THEMES.map(t => el('button', {
+        class: 'chip', type: 'button',
+        'aria-pressed': String(theme.preference() === t.id),
+        text: t.label,
+        onclick: () => { theme.set(t.id); refresh(); },
+      }))),
+      el('p', { class: 'help', text: theme.preference() === 'system'
+        ? `Following this phone, which is currently ${theme.resolved()}.`
+        : 'Set here, whatever the phone is doing.' }),
     ]),
 
     el('div', { class: 'section-title', text: 'Photos' }),

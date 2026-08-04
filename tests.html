@@ -43,6 +43,7 @@ import * as ean from './js/vendor/ean.js';
 import { addInterval, daysBetween } from './js/core/model.js';
 import { warrantyEnd, warrantyState } from './js/data/purchases.js';
 import { shrink, storagePath } from './js/features/photos.js';
+import { resolve } from './js/core/theme.js';
 import {
   usageStats, memberActivity, spendTotal, spendByMonth, spendByVendor,
   monthsBack, yearStart,
@@ -641,6 +642,22 @@ group('Photos');
 
   const custom = await shrink(await png(2000, 1000), { maxEdge: 100 });
   check('the cap is a parameter', [custom.width, custom.height], [100, 50]);
+}
+
+/* ----------------------------------------------------------------- Appearance
+   "System" has to mean the system, and an explicit choice has to beat it —
+   including when the two disagree, which is the whole reason the setting exists. */
+
+group('Appearance');
+{
+  check('system on a dark phone', resolve('system', true), 'dark');
+  check('system on a light phone', resolve('system', false), 'light');
+  check('dark beats a light phone', resolve('dark', false), 'dark');
+  check('light beats a dark phone', resolve('light', true), 'light');
+  // Anything unrecognised — a hand-edited key, a value from a future build —
+  // must fall back to the phone rather than to a guess.
+  check('an unknown preference follows the phone', resolve('sepia', true), 'dark');
+  check('no preference follows the phone', resolve(null, false), 'light');
 }
 
 /* ------------------------------------------------------------------ Summary */

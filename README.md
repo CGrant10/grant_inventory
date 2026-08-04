@@ -65,6 +65,19 @@ still cannot hard-drop rows.
 Set the flag without running the matching SQL and the app either shows a gate it
 does not need, or fails every request with `violates row-level security policy`.
 
+## Appearance
+
+Settings → Appearance is System, Light or Dark. "System" stores nothing and lets
+the media query in `css/tokens.css` answer, so a phone that switches at sunset
+takes the app with it; the other two set `data-theme` on `<html>` and win outright.
+
+The choice is applied twice on purpose. An inline script in `index.html` sets the
+attribute before the first paint — a module is deferred until after the document
+is parsed, so without it a phone set to Light with the app set to Dark flashes a
+full cream screen on every cold start. `js/core/theme.js` then takes over and keeps
+the `theme-color` meta in step by reading whatever `--bg` actually resolved to, so
+the browser chrome can never disagree with the screen.
+
 ## Branding
 
 The badge in `assets/logo-source.png` is the single source for every icon —
