@@ -1,15 +1,24 @@
-// Dashboard. Answers the four questions the app exists for, at a glance:
-// what's low, what's expiring, where things are, what to buy.
+// Dashboard.
+//
+// Home answers one question — is there anything I need to do? — and then gets
+// out of the way. Everything else the app can show is one tap away in the tab
+// bar or under House, and repeating it here as a wall of tiles only buried the
+// answer under its own table of contents.
+//
+// What earns a place on this screen: something time-sensitive, something done
+// often, or something with nowhere else to live. Counts of things you already
+// own are none of those, so they sit quietly at the bottom instead of leading in
+// the largest type on the screen.
 
 import { el, icon, ICONS, empty } from '../ui/dom.js';
 import * as idb from '../core/idb.js';
 import { reconcile } from '../features/low-stock.js';
-import { isLow, expiryState } from '../data/items.js';
-import { dueState } from '../data/maintenance.js';
-import { warrantyState } from '../data/purchases.js';
+import { isLow, expiryState, fmtQty } from '../data/items.js';
+import { dueState, dueLabel } from '../data/maintenance.js';
+import { warrantyState, warrantyLabel } from '../data/purchases.js';
 
 export default async function home() {
-  // Bring the shopping list in step first, or the "To buy" figure here disagrees
+  // Bring the shopping list in step first, or the "to buy" figure here disagrees
   // with the list itself — which is worse than being slightly slow.
   await reconcile();
 
@@ -23,61 +32,142 @@ export default async function home() {
 
   if (!items.length && !locations.length) return firstRun();
 
-  const low = items.filter(isLow);
-  const soon = expiringSoon(items);
   const needed = shopping.filter(s => s.status === 'needed' || s.status === 'in_cart');
-
-  // Things that are already a problem, rather than merely approaching one.
-  // Expired food and an overdue job deserve to be the first thing on the screen.
-  const expired = items.filter(i => expiryState(i) === 'expired');
-  const overdue = tasks.filter(t => dueState(t).state === 'overdue');
-  // A warranty is only actionable while it still exists, so this warns before
-  // the date rather than reporting it afterwards.
-  const lapsing = purchases.filter(p => !p.deleted_at && warrantyState(p, 30) === 'soon');
-
-  const alerts = [
-    expired.length && {
-      text: `${expired.length} item${expired.length === 1 ? ' has' : 's have'} expired`,
-      href: '#/inventory?filter=expiring',
-    },
-    overdue.length && {
-      text: `${overdue.length} maintenance job${overdue.length === 1 ? ' is' : 's are'} overdue`,
-      href: '#/maintenance',
-    },
-    lapsing.length && {
-      text: `${lapsing.length} warrant${lapsing.length === 1 ? 'y ends' : 'ies end'} within 30 days`,
-      href: '#/purchases',
-    },
-  ].filter(Boolean);
+  const rows = attention({ items, tasks, purchases });
 
   return el('div', { class: 'stack' }, [
-    ...alerts.map(a => el('a', { class: 'alert-strip', href: a.href }, [
-      icon(ICONS.warn, 20),
-      el('span', { text: a.text }),
-      el('span', { class: 'row-chevron' }, [icon(ICONS.chevron, 18)]),
-    ])),
+    rows.length
+      ? el('div', { class: 'list' }, rows.map(attentionRow))
+      : allClear(),
 
-    el('div', { class: 'stat-grid' }, [
-      stat('Items', items.length, '/inventory'),
-      stat('Places', locations.length, '/locations'),
-      stat('Low', low.length, '/inventory?filter=low', low.length ? 'warn' : null),
-      stat('To buy', needed.length, '/shopping', needed.length ? 'info' : null),
+    // The one action with nowhere else to live. Scanning, shopping and the item
+    // list are all permanent tabs; searching is in the top bar.
+    el('a', { class: 'btn btn-primary btn-lg btn-block', href: '#/quick' },
+      [icon(ICONS.minus, 22), el('span', { text: 'Quick log' })]),
+    el('a', { class: 'btn btn-block', href: '#/inventory?add=1' },
+      [icon(ICONS.plus, 20), el('span', { text: 'Add an item' })]),
+
+    el('div', { class: 'tally' }, [
+      tally(items.length, items.length === 1 ? 'item' : 'items', '#/inventory'),
+      tally(locations.length, locations.length === 1 ? 'place' : 'places', '#/locations'),
+      tally(needed.length, 'to buy', '#/shopping', needed.length ? 'accent' : null),
     ]),
+  ]);
+}
 
-    low.length ? section('Running low', low.slice(0, 5).map(i => itemRow(i, 'warn'))) : null,
-    soon.length ? section('Expiring soon', soon.slice(0, 5).map(i => itemRow(i, 'danger'))) : null,
+/**
+ * Everything that wants a decision, worst first.
+ *
+ * One row per kind rather than one per thing: five separate "running low" lines
+ * push the overdue furnace filter off the screen, and the filter is the more
+ * important of the two. A row names the thing when there is only one of it, and
+ * counts them when there are several — which is the way anyone would say it out
+ * loud.
+ */
+function attention({ items, tasks, purchases }) {
+  const expired = items.filter(i => expiryState(i) === 'expired');
+  const soon = items.filter(i => expiryState(i) === 'soon');
+  const low = items.filter(isLow);
+  const overdue = tasks.filter(t => dueState(t).state === 'overdue');
+  const today = tasks.filter(t => dueState(t).state === 'today');
+  const lapsing = purchases.filter(p => !p.deleted_at && warrantyState(p, 30) === 'soon');
 
-    el('div', { class: 'section-title', text: 'Quick actions' }),
-    el('div', { class: 'quick-grid' }, [
-      quick('Quick log', ICONS.minus, '#/quick'),
-      quick('Scan an item', ICONS.box, '#/scan'),
-      quick('Shopping list', ICONS.cart, '#/shopping'),
-      quick('Measurements', ICONS.ruler, '#/measurements'),
-      quick('Recent activity', ICONS.clock, '#/activity'),
-      quick('Search everything', ICONS.search, '#/search'),
-      quick('Receipts', ICONS.receipt, '#/purchases'),
-      quick('Insights', ICONS.chart, '#/insights'),
+  const rows = [];
+
+  if (expired.length) rows.push({
+    tone: 'danger', glyph: ICONS.warn,
+    title: expired.length === 1
+      ? `${expired[0].name} has expired`
+      : `${expired.length} items have expired`,
+    sub: expired.length === 1 ? `Expired ${expired[0].expires_on}` : names(expired),
+    href: '#/inventory?filter=expiring',
+  });
+
+  if (overdue.length) rows.push({
+    tone: 'danger', glyph: ICONS.clock,
+    title: overdue.length === 1
+      ? overdue[0].name
+      : `${overdue.length} maintenance jobs are overdue`,
+    sub: overdue.length === 1 ? dueLabel(overdue[0]) : names(overdue),
+    href: '#/maintenance',
+  });
+
+  if (today.length) rows.push({
+    tone: 'warn', glyph: ICONS.clock,
+    title: today.length === 1 ? today[0].name : `${today.length} jobs are due today`,
+    sub: 'Due today',
+    href: '#/maintenance',
+  });
+
+  if (lapsing.length) rows.push({
+    tone: 'warn', glyph: ICONS.receipt,
+    title: lapsing.length === 1
+      ? lapsing[0].name
+      : `${lapsing.length} warranties end within 30 days`,
+    sub: lapsing.length === 1 ? warrantyLabel(lapsing[0]) : names(lapsing),
+    href: '#/purchases',
+  });
+
+  if (low.length) rows.push({
+    tone: 'warn', glyph: ICONS.cart,
+    title: low.length === 1
+      ? `${low[0].name} is running low`
+      : `${low.length} things are running low`,
+    sub: low.length === 1
+      ? `${fmtQty(low[0].quantity)} ${low[0].unit || ''} left, keep ${fmtQty(low[0].min_quantity)}`.replace(/\s+/g, ' ')
+      : names(low),
+    href: '#/inventory?filter=low',
+  });
+
+  if (soon.length) rows.push({
+    tone: 'info', glyph: ICONS.box,
+    title: soon.length === 1
+      ? `${soon[0].name} expires soon`
+      : `${soon.length} things expire soon`,
+    sub: soon.length === 1 ? `Expires ${soon[0].expires_on}` : names(soon),
+    href: '#/inventory?filter=expiring',
+  });
+
+  return rows;
+}
+
+/** "Milk, Coffee and 3 more" — enough to recognise, not enough to scroll. */
+function names(list, shown = 2) {
+  const named = list.slice(0, shown).map(x => x.name).join(', ');
+  const rest = list.length - shown;
+  return rest > 0 ? `${named} and ${rest} more` : named;
+}
+
+function attentionRow({ tone, glyph, title, sub, href }) {
+  return el('a', { class: 'row', href }, [
+    el('span', { class: `row-icon is-${tone}` }, [icon(glyph, 20)]),
+    el('div', { class: 'row-main' }, [
+      el('div', { class: 'row-title', text: title }),
+      el('div', { class: 'row-sub', text: sub }),
     ]),
+    el('span', { class: 'row-chevron' }, [icon(ICONS.chevron, 20)]),
+  ]);
+}
+
+/**
+ * The reward state, and the reason the list above is worth keeping short: it has
+ * to be possible to get to the bottom of it.
+ */
+function allClear() {
+  return el('div', { class: 'all-clear' }, [
+    icon('<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/>', 30),
+    el('div', {}, [
+      el('div', { class: 'all-clear-title', text: 'Nothing needs you' }),
+      el('div', { class: 'all-clear-body', text:
+        'Nothing has expired, nothing is running low, and the house is up to date.' }),
+    ]),
+  ]);
+}
+
+function tally(value, label, href, tone) {
+  return el('a', { class: 'tally-item', href }, [
+    el('div', { class: `tally-value ${tone ? `is-${tone}` : ''}`, text: String(value) }),
+    el('div', { class: 'tally-label', text: label }),
   ]);
 }
 
@@ -90,55 +180,10 @@ function firstRun() {
         'Then scanning an item is enough to know what you have and where it is.' }),
       el('a', { class: 'btn btn-primary btn-lg btn-block', href: '#/locations', text: 'Add your first place' }),
     ]),
-    el('div', { class: 'section-title', text: 'Or jump in' }),
-    el('div', { class: 'quick-grid' }, [
-      quick('Scan an item', ICONS.box, '#/scan'),
-      quick('Shopping list', ICONS.cart, '#/shopping'),
-      quick('Measurements', ICONS.ruler, '#/measurements'),
-      quick('Projects', ICONS.hammer, '#/projects'),
-    ]),
+    el('p', { class: 'help', text:
+      'Everything else lives in the bar at the bottom: your items, the scanner, '
+      + 'the shopping list, and everything about the house itself.' }),
   ]);
-}
-
-function stat(label, value, href, tone) {
-  return el('a', { class: 'stat', href: `#${href}` }, [
-    el('div', { class: `stat-value ${tone ? `is-${tone}` : ''}`, text: String(value) }),
-    el('div', { class: 'stat-label', text: label }),
-  ]);
-}
-
-function section(title, rows) {
-  return el('div', {}, [
-    el('div', { class: 'section-title', text: title }),
-    el('div', { class: 'list' }, rows),
-  ]);
-}
-
-function itemRow(item, tone) {
-  return el('a', { class: 'row', href: `#/item/${item.id}` }, [
-    el('div', { class: 'row-main' }, [
-      el('div', { class: 'row-title', text: item.name }),
-      el('div', { class: 'row-sub', text: `${fmtQty(item.quantity)} ${item.unit || ''}`.trim() }),
-    ]),
-    el('span', { class: `badge badge-${tone}`, text: tone === 'warn' ? 'Low' : 'Soon' }),
-    el('span', { class: 'row-chevron' }, [icon(ICONS.chevron, 20)]),
-  ]);
-}
-
-function quick(label, glyph, href) {
-  return el('a', { class: 'quick', href }, [icon(glyph, 26), el('span', { text: label })]);
-}
-
-function expiringSoon(items, days = 14) {
-  const limit = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
-  return items
-    .filter(i => i.expires_on && i.expires_on <= limit)
-    .sort((a, b) => a.expires_on.localeCompare(b.expires_on));
-}
-
-function fmtQty(q) {
-  const n = Number(q ?? 0);
-  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 export { empty };

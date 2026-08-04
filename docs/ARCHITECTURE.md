@@ -209,6 +209,16 @@ decisions worth keeping:
   worst case is an orphan blob wasting space — never a row pointing at a photo
   that does not exist, which is what other phones would see.
 
+**What earns a place on Home.** Something time-sensitive, something done often,
+or something with nowhere else to live. Nothing else. The dashboard had drifted
+into eight quick-action tiles, six of which were a second copy of the tab bar and
+the House tab, above two stat tiles counting things you already own — with the
+expired food and the overdue furnace filter below all of it. Home now leads with
+one row per *kind* of thing that wants a decision, worst first, naming the thing
+when there is one of it and counting when there are several. One row per kind
+rather than per thing, because five "running low" lines push the overdue filter
+off the screen and the filter matters more.
+
 **Never repaint under someone's hands.** Three rules, learned from the same bug:
 
 - A re-render is not a navigation. `router.refresh()` keeps the scroll position;

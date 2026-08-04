@@ -23,6 +23,14 @@ export default async function inventory() {
     onclick: () => itemForm({}),
   }, [icon(ICONS.plus, 20), el('span', { text: 'Add an item' })]);
 
+  // ?add=1 opens the form straight away, so "Add an item" from the dashboard is
+  // one tap rather than a tap and a scroll. The parameter is stripped first, or
+  // a back-tap would reopen the form every time.
+  if (query().get('add')) {
+    history.replaceState(null, '', location.pathname + location.search + '#/inventory');
+    itemForm({});
+  }
+
   if (!items.length) {
     return el('div', { class: 'stack' }, [
       empty({
