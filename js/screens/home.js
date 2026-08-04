@@ -60,8 +60,8 @@ export default async function home() {
 
     el('div', { class: 'section-title', text: 'Quick actions' }),
     el('div', { class: 'quick-grid' }, [
+      quick('Quick log', ICONS.minus, '#/quick'),
       quick('Scan an item', ICONS.box, '#/scan'),
-      quick('Add a place', ICONS.pin, '#/locations'),
       quick('Shopping list', ICONS.cart, '#/shopping'),
       quick('Measurements', ICONS.ruler, '#/measurements'),
       quick('Recent activity', ICONS.clock, '#/activity'),

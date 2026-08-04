@@ -89,6 +89,46 @@
 .alert-strip span:nth-child(2) { flex: 1; min-width: 0; }
 .alert-strip .row-chevron { color: inherit; }
 
+/* ---- Quick log ---- */
+
+.quick-modes { justify-content: center; }
+
+/* Big, thumb-sized, two per row. Someone who does not care about the app should
+   be able to hit the right one without looking closely. */
+.quick-grid-lg {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3);
+}
+.quick-tile {
+  display: grid;
+  align-content: center;
+  gap: var(--sp-1);
+  min-height: 86px;
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background-color: var(--surface);
+  text-align: center;
+  transition: transform var(--fast) var(--ease);
+}
+.quick-tile:active { transform: scale(.95); }
+.qt-name {
+  font-size: var(--fs-sm);
+  font-weight: 620;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.qt-count {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+/* Colour the count by what a tap will do, so the mode is never in doubt. */
+.quick-grid-lg[data-mode="use"]  .qt-count { color: var(--warn); }
+.quick-grid-lg[data-mode="add"]  .qt-count { color: var(--accent); }
+
 /* ---- Rows with a leading icon ---- */
 
 .row-icon {

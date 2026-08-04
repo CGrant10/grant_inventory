@@ -9,6 +9,7 @@ import { go } from '../core/router.js';
 import { mountInstall } from '../ui/install.js';
 import { isInstalled as installed, mode as installMode } from '../core/install.js';
 import * as updates from '../core/updates.js';
+import { voiceSetup } from '../ui/voice-setup.js';
 
 const MODE_LABEL = {
   open:  'Shared household',
@@ -61,6 +62,18 @@ export default async function settings() {
           'the browser bars. It works offline either way.' }),
         installSlot,
       ]),
+    ]),
+
+    el('div', { class: 'section-title', text: 'Quick logging' }),
+    el('div', { class: 'card stack-sm' }, [
+      el('p', { class: 'help', text:
+        'For anyone who will not open the app to deduct a banana: a home-screen '
+        + 'icon that logs it in one tap, or a Siri phrase on iPhone.' }),
+      el('button', {
+        class: 'btn btn-primary btn-block',
+        text: 'Set up shortcuts',
+        onclick: () => voiceSetup(),
+      }),
     ]),
 
     el('div', { class: 'section-title', text: 'This device' }),
