@@ -44,6 +44,7 @@ import { addInterval, daysBetween } from './js/core/model.js';
 import { warrantyEnd, warrantyState } from './js/data/purchases.js';
 import { shrink, storagePath } from './js/features/photos.js';
 import { resolve } from './js/core/theme.js';
+import { groupByShape } from './js/core/sync.js';
 import {
   usageStats, memberActivity, spendTotal, spendByMonth, spendByVendor,
   monthsBack, yearStart,
@@ -658,6 +659,46 @@ group('Appearance');
   // must fall back to the phone rather than to a guess.
   check('an unknown preference follows the phone', resolve('sepia', true), 'dark');
   check('no preference follows the phone', resolve(null, false), 'light');
+}
+
+/* ------------------------------------------------------------- Push batching
+   PostgREST rejects a whole batch — not the odd row — when the objects in it do
+   not carry identical keys, so getting this wrong wedges every queued write to
+   a table at once. */
+
+group('Sync — batching by shape');
+{
+  const shapes = rows => groupByShape(rows).map(g => g.map(r => r.id));
+
+  check('identical shapes travel together',
+        shapes([{ id: 'a', name: 'x' }, { id: 'b', name: 'y' }]), [['a', 'b']]);
+
+  // The real case: a locally created row next to one pulled from the server,
+  // which carries household_id that Postgres filled in from a default.
+  check('a local row and a server row are split',
+        shapes([
+          { id: 'new', name: 'x' },
+          { id: 'pulled', name: 'y', household_id: 'h' },
+        ]), [['new'], ['pulled']]);
+
+  check('rows regroup rather than fragmenting',
+        shapes([
+          { id: 'a', name: 'x' },
+          { id: 'b', name: 'y', household_id: 'h' },
+          { id: 'c', name: 'z' },
+          { id: 'd', name: 'w', household_id: 'h' },
+        ]), [['a', 'c'], ['b', 'd']]);
+
+  check('key order does not make a new shape',
+        shapes([{ id: 'a', name: 'x', kind: 'k' }, { id: 'b', kind: 'k', name: 'y' }]),
+        [['a', 'b']]);
+
+  check('nothing in, nothing out', groupByShape([]), []);
+  check('one row is one group', shapes([{ id: 'a' }]), [['a']]);
+
+  // A null still counts as a column present, which is what PostgREST cares about.
+  check('an explicit null is not a missing column',
+        shapes([{ id: 'a', notes: null }, { id: 'b', notes: 'hi' }]), [['a', 'b']]);
 }
 
 /* ------------------------------------------------------------------ Summary */
