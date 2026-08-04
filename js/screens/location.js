@@ -4,6 +4,7 @@
 import { el, icon, ICONS, empty } from '../ui/dom.js';
 import { locationRepo } from '../data/locations.js';
 import { placeForm, movePicker } from '../ui/place-form.js';
+import { itemForm } from '../ui/item-form.js';
 import { qrElement } from '../ui/qr.js';
 import { photoStrip } from '../ui/photo.js';
 import { sheet, close, confirmSheet } from '../ui/sheet.js';
@@ -57,6 +58,14 @@ export default async function location({ slug }) {
     items.length
       ? el('div', { class: 'list' }, items.map(itemRow))
       : el('p', { class: 'help', text: 'Nothing recorded here yet.' }),
+
+    // The whole point of the label on the bin: scan it, and the place you are
+    // standing in front of is already filled in. Filing a tote's contents should
+    // never mean hunting for its name in a list of forty.
+    el('button', {
+      class: 'btn btn-primary btn-block',
+      onclick: () => itemForm({ locationId: place.id, onDone: () => refresh() }),
+    }, [icon(ICONS.plus, 20), el('span', { text: 'Add an item here' })]),
 
     el('div', { class: 'section-title', text: 'Places inside' }),
     children.length
