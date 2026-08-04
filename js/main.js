@@ -29,6 +29,7 @@ const TITLES = {
   '/home-info': 'My House',
   '/measurements': 'Measurements',
   '/measurement': 'Measurement',
+  '/maintenance': 'Maintenance',
   '/projects': 'Projects',
   '/project': 'Project',
   '/settings': 'Settings',
@@ -59,6 +60,7 @@ function defineRoutes() {
   router.define('/measurements',   () => import('./screens/measurements.js'));
   router.define('/measurement/:id',() => import('./screens/measurement.js'));
 
+  router.define('/maintenance', () => import('./screens/maintenance.js'));
   router.define('/projects',    () => import('./screens/projects.js'));
   router.define('/project/:id', () => import('./screens/project.js'));
 }

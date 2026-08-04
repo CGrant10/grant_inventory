@@ -85,6 +85,12 @@ export default async function settings() {
       kv('Mode', MODE_LABEL[auth.mode()] ?? 'This phone only'),
       kv('Last sync', lastSync ? new Date(lastSync).toLocaleString() : 'Never'),
       kv('Waiting to send', String(pending)),
+      // A feature can ship before its migration is run. Say so plainly rather
+      // than leaving writes queued behind a silent 404.
+      sync.pendingMigrations().length ? el('p', { class: 'help warn-text', text:
+        `The database is missing ${sync.pendingMigrations().join(' and ')}. `
+        + 'Run the matching file in supabase/ from the Supabase SQL editor — '
+        + 'nothing is lost meanwhile, those changes are held on this phone.' }) : null,
       el('button', {
         class: 'btn btn-block',
         text: 'Sync now',

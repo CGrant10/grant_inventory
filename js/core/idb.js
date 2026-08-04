@@ -9,7 +9,9 @@
 import { TABLES, TABLE_NAMES } from './model.js';
 
 const DB_NAME = 'grant-inventory';
-const DB_VERSION = 1;
+// Bumped to 2 for the maintenance tables. The upgrade path creates whatever
+// stores TABLES lists and are missing, so adding a table is a bump and nothing else.
+const DB_VERSION = 2;
 
 let dbPromise = null;
 
@@ -42,7 +44,19 @@ export function open() {
       }
     };
 
-    req.onsuccess = () => resolve(req.result);
+    // Another tab holding the previous version open will block the upgrade, and
+    // the default behaviour is to wait for ever with no explanation. Say so.
+    req.onblocked = () => {
+      console.warn('[idb] upgrade blocked — this app is open in another tab');
+      reject(new Error('The app is open in another tab. Close it and reload to finish updating.'));
+    };
+
+    req.onsuccess = () => {
+      const db = req.result;
+      // If a newer version appears elsewhere, let go rather than block it.
+      db.onversionchange = () => { db.close(); dbPromise = null; };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
 

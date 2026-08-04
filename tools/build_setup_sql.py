@@ -8,7 +8,7 @@ Re-run after editing any of the three:  python tools/build_setup_sql.py
 
 import pathlib
 
-SOURCES = ("schema.sql", "policies.sql", "seed.sql")
+SOURCES = ("schema.sql", "maintenance.sql", "policies.sql", "seed.sql")
 OUT = pathlib.Path("supabase/setup.sql")
 
 header = """-- Grant Household Inventory — complete setup, in one paste.

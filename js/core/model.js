@@ -16,13 +16,15 @@ export const TABLES = {
   projects:         { indexes: ['status'] },
   project_lines:    { indexes: ['project_id'] },
   attachments:      { indexes: ['entity_id', 'entity_type'] },
+  maintenance_tasks:{ indexes: ['next_due_on', 'location_id', 'item_id'] },
+  maintenance_log:  { indexes: ['task_id', 'done_on'] },
 };
 
 export const TABLE_NAMES = Object.keys(TABLES);
 
 // Append-only tables never update in place, so sync pages them by created_at
 // instead of updated_at and never needs to reconcile edits.
-export const APPEND_ONLY = new Set(['item_events']);
+export const APPEND_ONLY = new Set(['item_events', 'maintenance_log']);
 
 export const LOCATION_KINDS = [
   { id: 'room',     label: 'Room' },
@@ -82,6 +84,59 @@ export const LINE_KINDS = [
   { id: 'tool',     label: 'Tool' },
   { id: 'task',     label: 'Task' },
 ];
+
+// Every-six-months means the same date six months on, not 182 days later. Days
+// drift, and by the third change the reminder is in the wrong week.
+export const INTERVAL_UNITS = [
+  { id: 'day',   label: 'days' },
+  { id: 'week',  label: 'weeks' },
+  { id: 'month', label: 'months' },
+  { id: 'year',  label: 'years' },
+];
+
+export const MAINTENANCE_PRESETS = [
+  { label: 'Monthly',      value: 1,  unit: 'month' },
+  { label: 'Every 3 months', value: 3, unit: 'month' },
+  { label: 'Every 6 months', value: 6, unit: 'month' },
+  { label: 'Yearly',       value: 1,  unit: 'year' },
+];
+
+/**
+ * Add an interval to a date, in local time, clamping to the end of a short
+ * month. 31 January plus one month is 28 February, not 3 March.
+ */
+export function addInterval(isoDate, value, unit) {
+  const [y, m, d] = String(isoDate).slice(0, 10).split('-').map(Number);
+  const n = Number(value) || 0;
+
+  if (unit === 'day')  return toIso(new Date(y, m - 1, d + n));
+  if (unit === 'week') return toIso(new Date(y, m - 1, d + n * 7));
+
+  const months = unit === 'year' ? n * 12 : n;
+  const target = new Date(y, m - 1 + months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(d, lastDay));
+  return toIso(target);
+}
+
+export function toIso(date) {
+  // Local date, not UTC: a job due "today" must not flip a day either side of
+  // midnight depending on the timezone.
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function today() {
+  return toIso(new Date());
+}
+
+export function daysBetween(fromIso, toIsoDate) {
+  const [y1, m1, d1] = String(fromIso).slice(0, 10).split('-').map(Number);
+  const [y2, m2, d2] = String(toIsoDate).slice(0, 10).split('-').map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
+}
 
 export function uuid() {
   if (crypto.randomUUID) return crypto.randomUUID();

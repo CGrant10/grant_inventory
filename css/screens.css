@@ -236,6 +236,27 @@
 }
 .dim-unit { font-size: var(--fs-xs); color: var(--text-3); }
 
+/* ---- Maintenance ---- */
+
+.maint-row { gap: var(--sp-3); }
+.maint-main { text-align: left; min-width: 0; flex: 1; }
+.maint-main .row-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.due-plain { font-weight: 600; color: var(--text-2); }
+
+/* "Did it" is the whole interaction, so it is a filled button, not a link. */
+.maint-done {
+  flex: none;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: var(--r-full);
+}
+
 /* ---- Projects ---- */
 
 /* A conic gradient is enough for a progress dot — no SVG, no library. */
@@ -388,6 +409,7 @@
   color: var(--text-3);
   line-height: 1.5;
 }
+.help.warn-text { color: var(--warn); }
 
 .version {
   padding: var(--sp-4) 0;

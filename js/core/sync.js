@@ -60,6 +60,26 @@ export async function sync() {
 
 const MAX_TRIES = 5;
 
+/**
+ * A table the database does not have yet.
+ *
+ * New features ship with a migration the household has to paste into Supabase,
+ * and there is always a window where the app knows about a table and the server
+ * does not. Treating that as a normal failure would abort every sync and park
+ * good data — so it is skipped, loudly in the console and harmlessly everywhere
+ * else, until the migration is run.
+ */
+function isMissingTable(err) {
+  return err?.status === 404 || /Could not find the table|does not exist/i.test(err?.message ?? '');
+}
+
+const missingTables = new Set();
+
+/** Tables the server is missing, for Settings to surface. */
+export function pendingMigrations() {
+  return [...missingTables];
+}
+
 async function push() {
   const ops = await idb.outboxAll();
   if (!ops.length) return;
@@ -86,6 +106,14 @@ async function push() {
       await sb.upsert(table, [...latest.values()]);
       for (const op of sending) await idb.outboxDelete(op.id);
     } catch (err) {
+      if (isMissingTable(err)) {
+        // Leave the ops queued and untouched: the migration may be run later,
+        // and burning retries would discard writes the user can still recover.
+        missingTables.add(table);
+        console.warn(`[sync] ${table} does not exist on the server yet — writes held`);
+        return;
+      }
+
       // One bad row must not block every later write. Count attempts, and give
       // up on an op that will clearly never succeed — parked in _meta so it can
       // be inspected rather than vanishing.
@@ -147,8 +175,16 @@ async function pull() {
 
     // Page until the server stops handing back full pages.
     for (;;) {
-      let rows = await sb.selectSince(table, column, cursor, 1000);
-      if (!rows?.length) break;
+      let rows;
+      try {
+        rows = await sb.selectSince(table, column, cursor, 1000);
+      } catch (err) {
+        if (!isMissingTable(err)) throw err;
+        missingTables.add(table);
+        console.warn(`[sync] ${table} does not exist on the server yet — skipped`);
+        break;
+      }
+      if (!rows?.length) { missingTables.delete(table); break; }
 
       if (table === 'items' && unsettled.size) {
         rows = await Promise.all(rows.map(async row => {
