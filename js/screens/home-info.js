@@ -24,6 +24,7 @@ export default async function homeInfo() {
           due.length ? `${due.length} due now` : maintenance.length ? `${maintenance.length} scheduled` : 'Nothing scheduled',
           ICONS.clock, '#/maintenance'),
       hub('Projects', active.length ? `${active.length} in progress` : 'Nothing planned yet', ICONS.hammer, '#/projects'),
+      hub('Activity', 'Who did what, and when', ICONS.clock, '#/activity'),
     ]),
   ]);
 }

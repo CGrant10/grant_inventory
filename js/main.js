@@ -33,6 +33,8 @@ const TITLES = {
   '/projects': 'Projects',
   '/project': 'Project',
   '/settings': 'Settings',
+  '/activity': 'Activity',
+  '/search': 'Search',
   '/labels': 'QR labels',
   '/l': 'Place',
   '/item': 'Item',
@@ -61,6 +63,8 @@ function defineRoutes() {
   router.define('/measurement/:id',() => import('./screens/measurement.js'));
 
   router.define('/maintenance', () => import('./screens/maintenance.js'));
+  router.define('/activity',    () => import('./screens/activity.js'));
+  router.define('/search',      () => import('./screens/search.js'));
   router.define('/projects',    () => import('./screens/projects.js'));
   router.define('/project/:id', () => import('./screens/project.js'));
 }
@@ -196,6 +200,7 @@ async function startApp() {
   document.getElementById('settings-btn').onclick = () => router.go('/settings');
 
   on(EVENTS.SYNC_STATE, state => { syncDot.dataset.state = state; });
+  syncDot.onclick = () => showSyncStatus();
   // Only repaint for changes that arrived from another device. A local write
   // already updated whatever made it, and re-rendering mid-interaction would
   // replace the control under the user's finger — the stepper especially.
@@ -206,6 +211,49 @@ async function startApp() {
   wireUpdateBar();
   sync.start();
   updates.start();
+}
+
+const SYNC_MEANING = {
+  synced:  ['Up to date', 'Everything on this phone matches the household database.'],
+  syncing: ['Syncing now', 'Sending and fetching changes.'],
+  offline: ['Offline', 'Changes are saved on this phone and will go up when you are back on the network.'],
+  error:   ['Could not sync', 'Something went wrong reaching the database. Nothing is lost — it will try again.'],
+  local:   ['This phone only', 'Not connected to the shared household database.'],
+};
+
+/** The dot is a colour; this is what it means, in words. */
+async function showSyncStatus() {
+  const [{ sheet, close }, { el }] = await Promise.all([
+    import('./ui/sheet.js'), import('./ui/dom.js'),
+  ]);
+  const state = syncDot.dataset.state || 'local';
+  const [title, body] = SYNC_MEANING[state] ?? SYNC_MEANING.local;
+  const { pending, lastSync } = await sync.status();
+  const missing = sync.pendingMigrations();
+
+  sheet({
+    title,
+    body: el('div', { class: 'stack-sm' }, [
+      el('p', { class: 'help', text: body }),
+      el('div', { class: 'kv' }, [
+        el('span', { class: 'kv-label', text: 'Last sync' }),
+        el('span', { class: 'kv-value', text: lastSync ? new Date(lastSync).toLocaleString() : 'Never' }),
+      ]),
+      el('div', { class: 'kv' }, [
+        el('span', { class: 'kv-label', text: 'Waiting to send' }),
+        el('span', { class: 'kv-value', text: String(pending) }),
+      ]),
+      missing.length ? el('p', { class: 'help warn-text', text:
+        `The database is missing ${missing.join(' and ')} — run the matching file in supabase/.` }) : null,
+    ]),
+    actions: [
+      el('button', { class: 'btn btn-block', text: 'Close', onclick: () => close() }),
+      el('button', {
+        class: 'btn btn-primary btn-block', text: 'Sync now',
+        onclick: async () => { close(); await sync.sync(); },
+      }),
+    ],
+  });
 }
 
 function wireUpdateBar() {

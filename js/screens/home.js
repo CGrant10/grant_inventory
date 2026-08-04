@@ -4,17 +4,19 @@
 import { el, icon, ICONS, empty } from '../ui/dom.js';
 import * as idb from '../core/idb.js';
 import { reconcile } from '../features/low-stock.js';
-import { isLow } from '../data/items.js';
+import { isLow, expiryState } from '../data/items.js';
+import { dueState } from '../data/maintenance.js';
 
 export default async function home() {
   // Bring the shopping list in step first, or the "To buy" figure here disagrees
   // with the list itself — which is worse than being slightly slow.
   await reconcile();
 
-  const [items, locations, shopping] = await Promise.all([
+  const [items, locations, shopping, tasks] = await Promise.all([
     idb.all('items'),
     idb.all('locations'),
     idb.all('shopping_items'),
+    idb.all('maintenance_tasks').catch(() => []),
   ]);
 
   if (!items.length && !locations.length) return firstRun();
@@ -23,7 +25,29 @@ export default async function home() {
   const soon = expiringSoon(items);
   const needed = shopping.filter(s => s.status === 'needed' || s.status === 'in_cart');
 
+  // Things that are already a problem, rather than merely approaching one.
+  // Expired food and an overdue job deserve to be the first thing on the screen.
+  const expired = items.filter(i => expiryState(i) === 'expired');
+  const overdue = tasks.filter(t => dueState(t).state === 'overdue');
+
+  const alerts = [
+    expired.length && {
+      text: `${expired.length} item${expired.length === 1 ? ' has' : 's have'} expired`,
+      href: '#/inventory?filter=expiring',
+    },
+    overdue.length && {
+      text: `${overdue.length} maintenance job${overdue.length === 1 ? ' is' : 's are'} overdue`,
+      href: '#/maintenance',
+    },
+  ].filter(Boolean);
+
   return el('div', { class: 'stack' }, [
+    ...alerts.map(a => el('a', { class: 'alert-strip', href: a.href }, [
+      icon(ICONS.warn, 20),
+      el('span', { text: a.text }),
+      el('span', { class: 'row-chevron' }, [icon(ICONS.chevron, 18)]),
+    ])),
+
     el('div', { class: 'stat-grid' }, [
       stat('Items', items.length, '/inventory'),
       stat('Places', locations.length, '/locations'),
@@ -40,6 +64,8 @@ export default async function home() {
       quick('Add a place', ICONS.pin, '#/locations'),
       quick('Shopping list', ICONS.cart, '#/shopping'),
       quick('Measurements', ICONS.ruler, '#/measurements'),
+      quick('Recent activity', ICONS.clock, '#/activity'),
+      quick('Search everything', ICONS.search, '#/search'),
     ]),
   ]);
 }

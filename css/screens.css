@@ -72,6 +72,23 @@
 .quick svg { color: var(--accent); flex: none; }
 .quick:active { background-color: var(--surface-2); }
 
+/* An alert is not a stat: it is something already wrong, so it gets the top of
+   the screen and the danger colour rather than a tile among four. */
+.alert-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-lg);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--fs-sm);
+  font-weight: 620;
+}
+.alert-strip span:nth-child(2) { flex: 1; min-width: 0; }
+.alert-strip .row-chevron { color: inherit; }
+
 /* ---- Rows with a leading icon ---- */
 
 .row-icon {
