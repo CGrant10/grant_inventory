@@ -18,6 +18,7 @@ export const TABLES = {
   attachments:      { indexes: ['entity_id', 'entity_type'] },
   maintenance_tasks:{ indexes: ['next_due_on', 'location_id', 'item_id'] },
   maintenance_log:  { indexes: ['task_id', 'done_on'] },
+  purchases:        { indexes: ['item_id', 'purchased_on', 'warranty_until'] },
 };
 
 export const TABLE_NAMES = Object.keys(TABLES);
@@ -92,6 +93,19 @@ export const INTERVAL_UNITS = [
   { id: 'week',  label: 'weeks' },
   { id: 'month', label: 'months' },
   { id: 'year',  label: 'years' },
+];
+
+// Warranties are quoted in months on the box — "1 year parts and labour",
+// "90 days". Stored as an end date, because that is the only thing anyone ever
+// needs to answer: is this still covered?
+export const WARRANTY_PRESETS = [
+  { label: 'No warranty', months: 0 },
+  { label: '90 days',     months: 3 },
+  { label: '1 year',      months: 12 },
+  { label: '2 years',     months: 24 },
+  { label: '3 years',     months: 36 },
+  { label: '5 years',     months: 60 },
+  { label: '10 years',    months: 120 },
 ];
 
 export const MAINTENANCE_PRESETS = [

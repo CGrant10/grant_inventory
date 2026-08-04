@@ -41,6 +41,11 @@ import { encode, toSvg, rsEncode, formatBits, versionBits, blockStructure } from
 import { slug } from './js/core/model.js';
 import * as ean from './js/vendor/ean.js';
 import { addInterval, daysBetween } from './js/core/model.js';
+import { warrantyEnd, warrantyState } from './js/data/purchases.js';
+import {
+  usageStats, memberActivity, spendTotal, spendByMonth, spendByVendor,
+  monthsBack, yearStart,
+} from './js/features/analytics.js';
 
 const out = document.getElementById('out');
 let passed = 0, failed = 0;
@@ -479,6 +484,118 @@ group('Maintenance — interval maths');
   check('daysBetween backwards (overdue)', daysBetween('2026-08-11', '2026-08-04'), -7);
   check('daysBetween across a leap day', daysBetween('2028-02-28', '2028-03-01'), 2);
   check('daysBetween across DST', daysBetween('2026-03-01', '2026-04-01'), 31);
+}
+
+/* ------------------------------------------------------------- Warranty dates
+   Same calendar arithmetic as maintenance, but the consequence of getting it
+   wrong is worse: a warranty shown as live when it lapsed last week. */
+
+group('Warranties');
+{
+  check('1 year from a purchase', warrantyEnd('2026-08-04', 12), '2027-08-04');
+  check('90 days quoted as 3 months', warrantyEnd('2026-08-04', 3), '2026-11-04');
+  check('leap-day purchase clamps', warrantyEnd('2028-02-29', 12), '2029-02-28');
+  check('no date means no warranty', warrantyEnd(null, 12), null);
+  check('zero months means no warranty', warrantyEnd('2026-08-04', 0), null);
+
+  const mk = until => ({ warranty_until: until });
+  const iso = days => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+
+  check('nothing recorded reads as null, not expired', warrantyState({}), null);
+  check('yesterday is expired', warrantyState(mk(iso(-1))), 'expired');
+  check('today still counts as covered', warrantyState(mk(iso(0))), 'soon');
+  check('next week is ending soon', warrantyState(mk(iso(7))), 'soon');
+  check('next year is comfortably active', warrantyState(mk(iso(365))), 'active');
+  check('the soon window is a parameter', warrantyState(mk(iso(45)), 30), 'active');
+  check('a deleted receipt has no warranty', warrantyState({ warranty_until: iso(365), deleted_at: 'x' }), null);
+}
+
+/* ------------------------------------------------------------------ Analytics
+   Every figure takes `asOf` so the answers are fixed, not dependent on the day
+   the tests happen to run. */
+
+group('Analytics — consumption');
+{
+  const asOf = '2026-08-04';
+  const at = (days, extra = {}) => ({
+    item_id: 'a', type: 'consume', delta: -1,
+    created_at: `${addInterval(asOf, -days, 'day')}T12:00:00Z`, ...extra,
+  });
+
+  const items = [{ id: 'a', name: 'Coffee', quantity: 10, unit: 'bag' }];
+
+  // 10 used over 100 days is 0.1/day; 10 in stock is 100 days of cover.
+  const events = Array.from({ length: 10 }, (_, i) => at(i * 10));
+  const [coffee] = usageStats(events, items, { days: 100, asOf });
+  check('usage totals the consumed events', coffee.used, 10);
+  check('cover is stock divided by the daily rate', coffee.daysLeft, 100);
+  check('and lands on a date', coffee.runsOutOn, '2026-11-12');
+
+  check('events outside the window are ignored',
+        usageStats([at(200)], items, { days: 100, asOf }).length, 0);
+  check('an event dated in the future is ignored',
+        usageStats([at(-5)], items, { days: 100, asOf }).length, 0);
+
+  // Adjustments are recounts, not usage. Counting them turns one correction
+  // into a fake spike and a fake run-out date.
+  check('adjustments are not usage',
+        usageStats([at(1, { type: 'adjust', delta: -8 })], items, { days: 100, asOf }).length, 0);
+
+  check('an item nobody used does not appear',
+        usageStats([], items, { days: 100, asOf }).length, 0);
+
+  check('deleted items are left out',
+        usageStats(events, [{ ...items[0], deleted_at: 'x' }], { days: 100, asOf }).length, 0);
+
+  // Two items, the scarcer one first.
+  const two = usageStats(
+    [...events, { item_id: 'b', type: 'consume', delta: -20, created_at: `${asOf}T09:00:00Z` }],
+    [...items, { id: 'b', name: 'Soap', quantity: 1 }],
+    { days: 100, asOf });
+  check('sorted by what runs out first', two.map(u => u.item.id), ['b', 'a']);
+
+  const who = memberActivity(
+    [at(1, { member_id: 'm1' }), at(2, { member_id: 'm1' }), at(3, { member_id: 'm2' }), at(90, { member_id: 'm2' })],
+    [{ id: 'm1', display_name: 'Grant' }, { id: 'm2', display_name: 'Sam' }],
+    { days: 30, asOf });
+  check('activity counts inside the window, busiest first',
+        who.map(w => [w.name, w.count]), [['Grant', 2], ['Sam', 1]]);
+}
+
+group('Analytics — spending');
+{
+  const asOf = '2026-08-04';
+  const buys = [
+    { purchased_on: '2026-08-01', price: 100, vendor: 'Menards' },
+    { purchased_on: '2026-08-03', price: 50,  vendor: 'menards ' },
+    { purchased_on: '2026-07-15', price: 25,  vendor: 'Amazon' },
+    { purchased_on: '2025-06-01', price: 999, vendor: 'Amazon' },   // outside 12 months
+    { purchased_on: '2026-08-02', price: 10,  vendor: null },
+    { purchased_on: null,         price: 500, vendor: 'Unknown' },   // undated
+    { purchased_on: '2026-08-02', price: 77,  deleted_at: 'x' },     // deleted
+  ];
+
+  check('this month sums only this month', spendTotal(buys, { from: '2026-08-01', to: asOf }), 160);
+  check('undated purchases are not counted', spendTotal(buys, { from: '2020-01-01', to: asOf }), 1184);
+  check('deleted receipts are not counted',
+        spendTotal([{ purchased_on: asOf, price: 5, deleted_at: 'x' }], { from: '2020-01-01', to: asOf }), 0);
+
+  const months = spendByMonth(buys, { months: 3, asOf });
+  check('three months, oldest first', months.map(m => m.key), ['2026-06', '2026-07', '2026-08']);
+  check('an empty month is kept as a zero, not dropped', months.map(m => m.total), [0, 25, 160]);
+  check('months are labelled', months.map(m => m.label), ['Jun', 'Jul', 'Aug']);
+
+  check('twelve months steps back a year', monthsBack(13, asOf)[0], '2025-08');
+
+  const vendors = spendByVendor(buys, { from: yearStart(asOf), to: asOf });
+  check('vendors ranked by spend',
+        vendors.map(v => [v.vendor, v.total]),
+        [['Menards', 150], ['Amazon', 25], ['Not recorded', 10]]);
+  check('one shop, however it was typed',
+        spendByVendor([
+          { purchased_on: asOf, price: 1, vendor: ' Ace ' },
+          { purchased_on: asOf, price: 2, vendor: 'ACE' },
+        ]).map(v => [v.vendor, v.total]), [['Ace', 3]]);
 }
 
 /* ------------------------------------------------------------------ Summary */

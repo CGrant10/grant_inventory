@@ -35,6 +35,8 @@ const TITLES = {
   '/settings': 'Settings',
   '/quick': 'Quick log',
   '/activity': 'Activity',
+  '/purchases': 'Receipts',
+  '/insights': 'Insights',
   '/search': 'Search',
   '/labels': 'QR labels',
   '/l': 'Place',
@@ -66,6 +68,8 @@ function defineRoutes() {
   router.define('/maintenance', () => import('./screens/maintenance.js'));
   router.define('/quick',       () => import('./screens/quick.js'));
   router.define('/activity',    () => import('./screens/activity.js'));
+  router.define('/purchases',   () => import('./screens/purchases.js'));
+  router.define('/insights',    () => import('./screens/insights.js'));
   router.define('/search',      () => import('./screens/search.js'));
   router.define('/projects',    () => import('./screens/projects.js'));
   router.define('/project/:id', () => import('./screens/project.js'));

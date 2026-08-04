@@ -6,17 +6,19 @@ import * as idb from '../core/idb.js';
 import { reconcile } from '../features/low-stock.js';
 import { isLow, expiryState } from '../data/items.js';
 import { dueState } from '../data/maintenance.js';
+import { warrantyState } from '../data/purchases.js';
 
 export default async function home() {
   // Bring the shopping list in step first, or the "To buy" figure here disagrees
   // with the list itself — which is worse than being slightly slow.
   await reconcile();
 
-  const [items, locations, shopping, tasks] = await Promise.all([
+  const [items, locations, shopping, tasks, purchases] = await Promise.all([
     idb.all('items'),
     idb.all('locations'),
     idb.all('shopping_items'),
     idb.all('maintenance_tasks').catch(() => []),
+    idb.all('purchases').catch(() => []),
   ]);
 
   if (!items.length && !locations.length) return firstRun();
@@ -29,6 +31,9 @@ export default async function home() {
   // Expired food and an overdue job deserve to be the first thing on the screen.
   const expired = items.filter(i => expiryState(i) === 'expired');
   const overdue = tasks.filter(t => dueState(t).state === 'overdue');
+  // A warranty is only actionable while it still exists, so this warns before
+  // the date rather than reporting it afterwards.
+  const lapsing = purchases.filter(p => !p.deleted_at && warrantyState(p, 30) === 'soon');
 
   const alerts = [
     expired.length && {
@@ -38,6 +43,10 @@ export default async function home() {
     overdue.length && {
       text: `${overdue.length} maintenance job${overdue.length === 1 ? ' is' : 's are'} overdue`,
       href: '#/maintenance',
+    },
+    lapsing.length && {
+      text: `${lapsing.length} warrant${lapsing.length === 1 ? 'y ends' : 'ies end'} within 30 days`,
+      href: '#/purchases',
     },
   ].filter(Boolean);
 
@@ -66,6 +75,8 @@ export default async function home() {
       quick('Measurements', ICONS.ruler, '#/measurements'),
       quick('Recent activity', ICONS.clock, '#/activity'),
       quick('Search everything', ICONS.search, '#/search'),
+      quick('Receipts', ICONS.receipt, '#/purchases'),
+      quick('Insights', ICONS.chart, '#/insights'),
     ]),
   ]);
 }

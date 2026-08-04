@@ -14,9 +14,15 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design.
 1. Create a free project at supabase.com.
 2. **SQL Editor** → run `supabase/schema.sql`, then `supabase/policies.sql`,
    then optionally `supabase/seed.sql`.
-3. **Authentication → Users → Add user**: email `household@grant-inventory.local`,
+3. Run the per-feature migrations, which are separate files and safe to re-run:
+   `supabase/maintenance.sql` and `supabase/purchases.sql`.
+
+   Until a migration is run the app still works — writes to that table stay
+   queued on the phone and the sync sheet says which file is missing — but
+   nothing syncs to the household until it is.
+4. **Authentication → Users → Add user**: email `household@grant-inventory.local`,
    password = the household passphrase, and tick *Auto Confirm User*.
-4. **Project Settings → API**: copy the project URL and the `anon` public key.
+5. **Project Settings → API**: copy the project URL and the `anon` public key.
 
 ### 2. The app
 
@@ -80,7 +86,27 @@ must be identical strings.
 
 ## Status
 
-Phase 1 (foundation) is in place: app shell, service worker, design tokens, router,
-auth gate, IndexedDB mirror, sync engine, and the database schema.
-Phases 2–8 — places and QR labels, inventory, scanning, shopping, measurements,
-projects, polish — are laid out in the architecture doc.
+All eight build phases from the architecture doc are shipped:
+
+| | |
+|---|---|
+| Foundation | shell, service worker, router, IndexedDB mirror, sync engine |
+| Places | tree of rooms and bins, QR codes, printable label sheets |
+| Inventory | items, quantities as events, categories, full history |
+| Scanning | barcodes, Open Food Facts lookup, scan-to-open a bin |
+| Low stock | minimums, an automatic shopping list, buy → restock in one tap |
+| Measurements | dimension sets per room, window, door or appliance |
+| Projects | status board, materials pulled from stock, cost roll-up |
+| Polish | activity feed, search across everything, expiry warnings |
+
+Since then: household **maintenance** on a cycle, **quick log** (one tap, and a
+URL anything can call), **receipts and warranties**, and **insights** — spending
+by month and by shop, what gets used most, and what is on course to run out.
+
+Not built yet: **photos**. The `attachments` table, the storage bucket and its
+policies all exist; nothing writes to them. That is the next real feature, and
+receipt images are waiting on it.
+
+Adding one is always the same shape: a table in `js/core/model.js`, a repository
+in `js/data/`, a screen, and a migration in `supabase/`. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

@@ -9,9 +9,11 @@
 import { TABLES, TABLE_NAMES } from './model.js';
 
 const DB_NAME = 'grant-inventory';
-// Bumped to 2 for the maintenance tables. The upgrade path creates whatever
-// stores TABLES lists and are missing, so adding a table is a bump and nothing else.
-const DB_VERSION = 2;
+// Bumped to 3 for the purchases table. The upgrade path creates whatever stores
+// TABLES lists and are missing, so adding a table is a bump and nothing else —
+// but it IS a bump: without one the store is never created and every read of the
+// new table throws NotFoundError.
+const DB_VERSION = 3;
 
 let dbPromise = null;
 

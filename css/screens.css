@@ -487,3 +487,70 @@
   gap: var(--sp-2);
   margin-top: var(--sp-4);
 }
+
+/* ---- Receipts and insights ---- */
+
+/* Currency needs more characters than a count, so the money tiles step down a
+   size rather than wrapping "$1,204" onto two lines inside a 4-up grid. */
+.stat-value.stat-money {
+  font-size: var(--fs-lg);
+  padding: var(--sp-1) 0;
+}
+
+.row-amount {
+  flex: none;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.kv-list { display: grid; gap: var(--sp-2); }
+
+/* A bar chart of rows, not columns. Twelve vertical bars on a phone leaves each
+   label four characters wide and each value none; horizontally every row gets
+   the whole screen and the eye still compares lengths. */
+.bars {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.bar-row {
+  display: grid;
+  grid-template-columns: 7.5ch 1fr auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 26px;
+  color: inherit;
+}
+.bar-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bar-track {
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--accent);
+}
+.bar-value {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+a.bar-row:active .bar-fill { background: var(--accent-press); }

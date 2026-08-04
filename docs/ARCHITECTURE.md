@@ -171,6 +171,31 @@ grant_inventory/
 7. **Projects** — status board, materials pulled from inventory, cost roll-up
 8. **Polish** — history feed, expiry warnings, search across everything
 
-Future features (receipts, warranties, maintenance schedules, voice, analytics) all land as
-a new `features/` module + a screen, reusing `attachments`, `item_events`, and the sync
-engine unchanged.
+All eight are shipped, and the prediction held: every feature since — maintenance,
+quick log, receipts and warranties, insights — landed as a repository plus a screen,
+with the sync engine untouched.
+
+## 9. Since the eight phases
+
+**Maintenance** (`maintenance_tasks`, `maintenance_log`) — jobs on a cycle, stored
+as a value plus a unit rather than a number of days.
+
+**Receipts and warranties** (`purchases`) — its own table rather than columns on
+`items`, for three reasons: you buy the same thing repeatedly and each purchase has
+its own price, seller and warranty; a receipt for the water heater should not
+require pretending to stock water heaters; and the sync engine already holds writes
+gracefully for a table the server does not have yet, whereas an unknown *column*
+would 400 and park every item write behind it. A purchase keeps its own `name`, so
+deleting the item does not blank the receipt.
+
+**Insights** (`features/analytics.js`) — pure functions over `item_events` and
+`purchases`, no new storage. Every one takes an `asOf` date so the answers can be
+tested rather than depending on the day the suite runs. Usage counts only `consume`
+events: an `adjust` is a recount, and treating a correction as consumption invents
+a spike and a false run-out date.
+
+**Still to build: photos.** `attachments`, the storage bucket and its policies are
+in place and unused. Receipt images, "what the bin actually looks like" and appliance
+model plates all wait on it. A phone photo downscaled to ~1600px is 200–300 KB, so
+the free tier's 1 GB holds a few thousand — the binding constraint is egress, which
+is what the IndexedDB blob cache is for.

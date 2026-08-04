@@ -5,6 +5,8 @@ import { itemRepo, isLow, expiryState, fmtQty } from '../data/items.js';
 import { categoryRepo } from '../data/categories.js';
 import { locationRepo } from '../data/locations.js';
 import { itemForm, moveItem } from '../ui/item-form.js';
+import { purchaseForm } from '../ui/purchase-form.js';
+import { purchaseRepo, warrantyState, warrantyLabel, fmtMoney } from '../data/purchases.js';
 import { stepper } from '../ui/stepper.js';
 import { sheet, close, confirmSheet } from '../ui/sheet.js';
 import { toast, errorToast } from '../ui/toast.js';
@@ -22,11 +24,12 @@ export default async function item({ id }) {
     });
   }
 
-  const [categories, place, history, members] = await Promise.all([
+  const [categories, place, history, members, receipts] = await Promise.all([
     categoryRepo.map(),
     row.location_id ? idb.get('locations', row.location_id) : null,
     itemRepo.history(row.id),
     idb.all('members'),
+    purchaseRepo.forItem(row.id).catch(() => []),
   ]);
 
   const memberName = new Map(members.map(m => [m.id, m.display_name]));
@@ -78,6 +81,11 @@ export default async function item({ id }) {
 
     row.notes ? el('p', { class: 'help selectable', text: row.notes }) : null,
 
+    receipts.length ? el('div', { class: 'section-title', text: 'Purchases' }) : null,
+    receipts.length
+      ? el('div', { class: 'list' }, receipts.map(p => receiptRow(p)))
+      : null,
+
     el('div', { class: 'section-title', text: 'History' }),
     history.length
       ? el('div', { class: 'list' }, history.map(e => eventRow(e, memberName)))
@@ -105,6 +113,22 @@ function eventRow(event, memberName) {
   ]);
 }
 
+/** A receipt as seen from the item: the price and whether it is still covered. */
+function receiptRow(purchase) {
+  const state = warrantyState(purchase);
+  const sub = [purchase.purchased_on, purchase.vendor, state && warrantyLabel(purchase)]
+    .filter(Boolean).join(' · ');
+
+  return el('a', { class: 'row', href: '#/purchases' }, [
+    el('div', { class: 'row-main' }, [
+      el('div', { class: 'row-title', text: purchase.price != null ? fmtMoney(purchase.price) : purchase.name }),
+      el('div', { class: 'row-sub', text: sub || 'No details recorded' }),
+    ]),
+    state === 'expired' ? el('span', { class: 'badge badge-danger', text: 'Warranty over' })
+      : state ? el('span', { class: 'badge badge-ok', text: 'Covered' }) : null,
+  ]);
+}
+
 function options(row) {
   const act = fn => () => { close(); fn(); };
 
@@ -113,6 +137,8 @@ function options(row) {
     body: el('div', { class: 'list' }, [
       el('button', { class: 'row', onclick: act(() => itemForm({ item: row, onDone: refresh })) },
         [el('div', { class: 'row-main' }, [el('div', { class: 'row-title', text: 'Edit details' })])]),
+      el('button', { class: 'row', onclick: act(() => purchaseForm({ item: row, onDone: refresh })) },
+        [el('div', { class: 'row-main' }, [el('div', { class: 'row-title', text: 'Record a purchase' })])]),
       el('button', { class: 'row', onclick: act(() => moveItem({ item: row, onDone: refresh })) },
         [el('div', { class: 'row-main' }, [el('div', { class: 'row-title', text: 'Move to another place' })])]),
       el('button', { class: 'row', onclick: act(() => setExact(row)) },

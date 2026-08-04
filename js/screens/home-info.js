@@ -4,15 +4,18 @@ import { el, icon, ICONS } from '../ui/dom.js';
 import * as idb from '../core/idb.js';
 
 export default async function homeInfo() {
-  const [locations, measurements, projects, maintenance] = await Promise.all([
+  const [locations, measurements, projects, maintenance, purchases] = await Promise.all([
     idb.all('locations'),
     idb.all('measurements'),
     idb.all('projects'),
     idb.all('maintenance_tasks'),
+    idb.all('purchases').catch(() => []),
   ]);
 
   const { dueState } = await import('../data/maintenance.js');
+  const { warrantyState } = await import('../data/purchases.js');
   const due = maintenance.filter(t => ['overdue', 'today'].includes(dueState(t).state));
+  const covered = purchases.filter(p => ['active', 'soon'].includes(warrantyState(p)));
 
   const active = projects.filter(p => p.status === 'active' || p.status === 'planned');
 
@@ -24,6 +27,11 @@ export default async function homeInfo() {
           due.length ? `${due.length} due now` : maintenance.length ? `${maintenance.length} scheduled` : 'Nothing scheduled',
           ICONS.clock, '#/maintenance'),
       hub('Projects', active.length ? `${active.length} in progress` : 'Nothing planned yet', ICONS.hammer, '#/projects'),
+      hub('Receipts & warranties',
+          covered.length ? `${covered.length} still under warranty`
+            : purchases.length ? `${purchases.length} recorded` : 'Nothing recorded yet',
+          ICONS.receipt, '#/purchases'),
+      hub('Insights', 'Spending, and what runs out', ICONS.chart, '#/insights'),
       hub('Activity', 'Who did what, and when', ICONS.clock, '#/activity'),
     ]),
   ]);
