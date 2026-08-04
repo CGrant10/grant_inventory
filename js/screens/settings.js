@@ -5,7 +5,8 @@ import * as sync from '../core/sync.js';
 import * as idb from '../core/idb.js';
 import { toast, errorToast } from '../ui/toast.js';
 import { confirmSheet } from '../ui/sheet.js';
-import { go } from '../core/router.js';
+import { go, refresh } from '../core/router.js';
+import * as photos from '../features/photos.js';
 import { mountInstall } from '../ui/install.js';
 import { isInstalled as installed, mode as installMode } from '../core/install.js';
 import * as updates from '../core/updates.js';
@@ -32,6 +33,11 @@ export default async function settings() {
   const dev = auth.device();
   const { pending, lastSync } = await sync.status();
   const b = backend();
+
+  const held = await idb.blobAll();
+  const photoCount = held.length;
+  const photoBytes = held.reduce((sum, r) => sum + (r.blob?.size ?? 0), 0);
+  const photosPending = held.filter(r => !r.uploaded && r.path).length;
 
   const nameField = el('input', { class: 'field', type: 'text', value: dev.name, placeholder: 'Your name' });
   const urlField = el('input', {
@@ -109,6 +115,27 @@ export default async function settings() {
         text: 'Sync now',
         onclick: async () => { await sync.sync(); toast('Sync finished'); },
       }),
+    ]),
+
+    el('div', { class: 'section-title', text: 'Photos' }),
+    el('div', { class: 'card stack-sm' }, [
+      kv('Held on this phone', `${photoCount} · ${fmtBytes(photoBytes)}`),
+      kv('Waiting to upload', String(photosPending)),
+      el('p', { class: 'help', text:
+        'Photos are shrunk to 1600px before they are sent, and every one this phone '
+        + 'has seen is kept here — so it downloads once, not once per look.' }),
+      photosPending
+        ? el('button', {
+            class: 'btn btn-block',
+            text: 'Upload them now',
+            onclick: async function () {
+              this.disabled = true;
+              const sent = await photos.drain();
+              toast(sent ? `Uploaded ${sent}` : 'Could not upload — will retry');
+              refresh();
+            },
+          })
+        : null,
     ]),
 
     el('div', { class: 'section-title', text: 'Supabase project' }),
@@ -241,6 +268,14 @@ export default async function settings() {
       }),
     ]),
   ]);
+}
+
+/** Sizes people can act on: "0.4 MB" tells you nothing you would do differently. */
+function fmtBytes(bytes) {
+  if (!bytes) return '0 MB';
+  const mb = bytes / 1_048_576;
+  if (mb < 1) return `${Math.round(bytes / 1024)} KB`;
+  return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
 }
 
 function kv(label, value) {

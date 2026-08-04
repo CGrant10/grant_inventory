@@ -6,6 +6,7 @@ import * as auth from './core/auth.js';
 import * as router from './core/router.js';
 import * as sync from './core/sync.js';
 import * as updates from './core/updates.js';
+import * as photos from './features/photos.js';
 import * as idb from './core/idb.js';
 import { on, EVENTS } from './core/bus.js';
 import { errorToast } from './ui/toast.js';
@@ -217,6 +218,7 @@ async function startApp() {
   wireUpdateBar();
   sync.start();
   updates.start();
+  photos.start();
 }
 
 const SYNC_MEANING = {

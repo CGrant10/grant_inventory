@@ -5,6 +5,7 @@ import { el, icon, ICONS, empty } from '../ui/dom.js';
 import { locationRepo } from '../data/locations.js';
 import { placeForm, movePicker } from '../ui/place-form.js';
 import { qrElement } from '../ui/qr.js';
+import { photoStrip } from '../ui/photo.js';
 import { sheet, close, confirmSheet } from '../ui/sheet.js';
 import { toast, errorToast } from '../ui/toast.js';
 import { go, refresh } from '../core/router.js';
@@ -48,6 +49,9 @@ export default async function location({ slug }) {
     ]),
 
     place.notes ? el('p', { class: 'help selectable', text: place.notes }) : null,
+
+    // A photo of the bin answers "which one is it?" faster than its name does.
+    photoStrip('location', place.id, { onChange: refresh }),
 
     el('div', { class: 'section-title', text: `What's in here (${items.length})` }),
     items.length

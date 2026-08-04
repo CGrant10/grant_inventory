@@ -3,6 +3,7 @@
 import { el, icon, ICONS, empty } from '../ui/dom.js';
 import { measurementRepo, fmtNumber } from '../data/measurements.js';
 import { measurementForm } from '../ui/measurement-form.js';
+import { photoStrip } from '../ui/photo.js';
 import { confirmSheet } from '../ui/sheet.js';
 import { toast } from '../ui/toast.js';
 import { go, refresh } from '../core/router.js';
@@ -61,6 +62,9 @@ export default async function measurement({ id }) {
       : null,
 
     row.notes ? el('p', { class: 'help selectable', text: row.notes }) : null,
+
+    // What was measured, and from where — three numbers rarely say which window.
+    photoStrip('measurement', row.id, { onChange: refresh }),
 
     el('button', {
       class: 'btn btn-danger btn-block',

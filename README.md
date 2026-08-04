@@ -100,12 +100,30 @@ All eight build phases from the architecture doc are shipped:
 | Polish | activity feed, search across everything, expiry warnings |
 
 Since then: household **maintenance** on a cycle, **quick log** (one tap, and a
-URL anything can call), **receipts and warranties**, and **insights** — spending
-by month and by shop, what gets used most, and what is on course to run out.
+URL anything can call), **receipts and warranties**, **insights** — spending by
+month and by shop, what gets used most, and what is on course to run out — and
+**photos** on items, places, measurements, projects and receipts.
 
-Not built yet: **photos**. The `attachments` table, the storage bucket and its
-policies all exist; nothing writes to them. That is the next real feature, and
-receipt images are waiting on it.
+## Photos
+
+Every photo is shrunk to fit inside 1600px and re-encoded as JPEG before it is
+sent: a 12-megapixel phone photo is about 4 MB, and the same picture at 1600px is
+about 250 KB. That is the difference between 250 photos and 4,000 in the free
+tier's 1 GB.
+
+Capture never waits for the network. The blob is written to IndexedDB and the
+`attachments` row to the outbox, and the upload happens on the next sync — or
+whenever the phone next has signal. Settings → Photos says how many are still
+only on one phone.
+
+Every photo the phone downloads is kept in the same store, so it is fetched once
+rather than once per look. Egress (5 GB/month) is scarcer than storage, and that
+cache is what protects it.
+
+Deleting a photo is a soft delete, like everything else: the row is tombstoned so
+every phone drops it, but the file stays in the bucket — anon has no delete
+permission on storage, deliberately, so a passer-by cannot wipe the household's
+photos. Reclaiming that space is a job for the Supabase dashboard.
 
 Adding one is always the same shape: a table in `js/core/model.js`, a repository
 in `js/data/`, a screen, and a migration in `supabase/`. See

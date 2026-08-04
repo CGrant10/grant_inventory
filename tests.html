@@ -42,6 +42,7 @@ import { slug } from './js/core/model.js';
 import * as ean from './js/vendor/ean.js';
 import { addInterval, daysBetween } from './js/core/model.js';
 import { warrantyEnd, warrantyState } from './js/data/purchases.js';
+import { shrink, storagePath } from './js/features/photos.js';
 import {
   usageStats, memberActivity, spendTotal, spendByMonth, spendByVendor,
   monthsBack, yearStart,
@@ -596,6 +597,50 @@ group('Analytics — spending');
           { purchased_on: asOf, price: 1, vendor: ' Ace ' },
           { purchased_on: asOf, price: 2, vendor: 'ACE' },
         ]).map(v => [v.vendor, v.total]), [['Ace', 3]]);
+}
+
+/* -------------------------------------------------------------------- Photos
+   The shrink step is what keeps a household inside a 1 GB bucket, so it is worth
+   proving rather than assuming. These run against real canvas encoding. */
+
+group('Photos');
+{
+  check('storage path is foldered by entity and named by attachment',
+        storagePath('item', 'abc', 'def'), 'item/abc/def.jpg');
+
+  const png = async (w, h) => {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    // Not a flat fill: a solid colour compresses to almost nothing and would
+    // make the size assertions meaningless.
+    for (let x = 0; x < w; x += 8) {
+      ctx.fillStyle = `hsl(${(x * 7) % 360} 70% 50%)`;
+      ctx.fillRect(x, 0, 8, h);
+    }
+    return new Promise(r => c.toBlob(r, 'image/png'));
+  };
+
+  const big = await png(3000, 2000);
+  const shrunk = await shrink(big);
+  check('the long edge is capped', [shrunk.width, shrunk.height], [1600, 1067]);
+  check('re-encoded as JPEG', shrunk.blob.type, 'image/jpeg');
+  // Not "smaller than the source blob": a synthetic test image is flat colour
+  // that PNG stores better than JPEG ever will, so that would test the codecs,
+  // not the feature. What shrink promises is pixels, and a bounded result.
+  ok('a fraction of the pixels', (shrunk.width * shrunk.height) / (3000 * 2000) < 0.3,
+     `${shrunk.width}x${shrunk.height} from 3000x2000`);
+  ok('comfortably inside a few hundred KB', shrunk.blob.size < 500 * 1024,
+     `${Math.round(shrunk.blob.size / 1024)}KB`);
+
+  const tall = await shrink(await png(1000, 4000));
+  check('portrait is capped on its own long edge', [tall.width, tall.height], [400, 1600]);
+
+  const small = await shrink(await png(800, 600));
+  check('an already-small photo keeps its size', [small.width, small.height], [800, 600]);
+
+  const custom = await shrink(await png(2000, 1000), { maxEdge: 100 });
+  check('the cap is a parameter', [custom.width, custom.height], [100, 50]);
 }
 
 /* ------------------------------------------------------------------ Summary */

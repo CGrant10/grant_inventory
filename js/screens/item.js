@@ -6,6 +6,7 @@ import { categoryRepo } from '../data/categories.js';
 import { locationRepo } from '../data/locations.js';
 import { itemForm, moveItem } from '../ui/item-form.js';
 import { purchaseForm } from '../ui/purchase-form.js';
+import { photoStrip } from '../ui/photo.js';
 import { purchaseRepo, warrantyState, warrantyLabel, fmtMoney } from '../data/purchases.js';
 import { stepper } from '../ui/stepper.js';
 import { sheet, close, confirmSheet } from '../ui/sheet.js';
@@ -80,6 +81,8 @@ export default async function item({ id }) {
     ]),
 
     row.notes ? el('p', { class: 'help selectable', text: row.notes }) : null,
+
+    photoStrip('item', row.id, { onChange: refresh }),
 
     receipts.length ? el('div', { class: 'section-title', text: 'Purchases' }) : null,
     receipts.length

@@ -194,8 +194,23 @@ tested rather than depending on the day the suite runs. Usage counts only `consu
 events: an `adjust` is a recount, and treating a correction as consumption invents
 a spike and a false run-out date.
 
-**Still to build: photos.** `attachments`, the storage bucket and its policies are
-in place and unused. Receipt images, "what the bin actually looks like" and appliance
-model plates all wait on it. A phone photo downscaled to ~1600px is 200–300 KB, so
-the free tier's 1 GB holds a few thousand — the binding constraint is egress, which
-is what the IndexedDB blob cache is for.
+**Photos** (`features/photos.js`, `data/attachments.js`, `ui/photo.js`) — one
+`attachments` table for every kind of parent, keyed by `entity_type` + `entity_id`,
+so adding photos to a new kind of thing is a string rather than a migration. Three
+decisions worth keeping:
+
+- **Shrink before storing, not before sending.** A photo is capped at 1600px the
+  moment it is picked, so the phone never holds a 4 MB original either. 1 GB then
+  holds a few thousand photos instead of 250.
+- **`_blobs` is the queue and the cache at once**, separated by an `uploaded` flag.
+  A record stays after it uploads, which is what stops every phone re-downloading
+  the same picture on every visit. Egress (5 GB/month) is scarcer than storage.
+- **The blob is written before the row.** If the app dies between the two, the
+  worst case is an orphan blob wasting space — never a row pointing at a photo
+  that does not exist, which is what other phones would see.
+
+The uploader rides on the sync engine's `synced` event rather than keeping a timer:
+if the network was good enough to sync, it is good enough to upload. Failures stay
+queued rather than being counted out — unlike a bad row, a photo that will not
+upload is nearly always transient, and the blob is the household's only copy until
+it lands.

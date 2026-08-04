@@ -156,6 +156,29 @@ export async function uploadPhoto(path, blob) {
     headers: { ...(await authHeaders()), 'Content-Type': blob.type || 'image/jpeg', 'x-upsert': 'true' },
     body: blob,
   });
-  if (!res.ok) throw new Error(await readError(res));
-  return `${url}/storage/v1/object/public/photos/${path}`;
+  if (!res.ok) {
+    const err = new Error(await readError(res));
+    err.status = res.status;
+    throw err;
+  }
+  return publicPhotoUrl(path);
+}
+
+/** The bucket is public, so reads need no token and can be cached like any image. */
+export function publicPhotoUrl(path) {
+  if (!isConfigured()) return null;
+  return `${backend().url}/storage/v1/object/public/photos/${path}`;
+}
+
+/** Fetch a photo's bytes so it can be cached locally and shown offline. */
+export async function downloadPhoto(path) {
+  const url = publicPhotoUrl(path);
+  if (!url) throw new Error('Backend not configured');
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = new Error(await readError(res));
+    err.status = res.status;
+    throw err;
+  }
+  return res.blob();
 }

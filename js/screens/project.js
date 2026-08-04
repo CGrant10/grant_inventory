@@ -3,6 +3,7 @@
 import { el, icon, ICONS, empty } from '../ui/dom.js';
 import { projectRepo, money } from '../data/projects.js';
 import { projectForm } from './projects.js';
+import { photoStrip } from '../ui/photo.js';
 import { measurementRepo, summarise } from '../data/measurements.js';
 import { PROJECT_STATUSES, LINE_KINDS, UNITS } from '../core/model.js';
 import { sheet, close, confirmSheet } from '../ui/sheet.js';
@@ -65,6 +66,9 @@ export default async function project({ id }) {
       : null,
 
     row.description ? el('p', { class: 'help selectable', text: row.description }) : null,
+
+    // Before, during, after — a project is the one thing here with a story.
+    photoStrip('project', row.id, { onChange: refresh }),
 
     ...byKind.map(([kind, list]) => el('div', {}, [
       el('div', { class: 'section-title', text: `${kind.label}s (${list.filter(l => l.done).length}/${list.length})` }),

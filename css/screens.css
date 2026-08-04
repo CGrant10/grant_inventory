@@ -554,3 +554,71 @@
   white-space: nowrap;
 }
 a.bar-row:active .bar-fill { background: var(--accent-press); }
+
+/* ---- Photos ---- */
+
+/* A scroll strip, not a grid: the number of photos is unknown and a grid of one
+   photo looks broken. Scrolling sideways also keeps the rest of the screen where
+   it was, however many get added. */
+.photo-strip {
+  display: flex;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  padding-bottom: var(--sp-1);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.photo-strip::-webkit-scrollbar { display: none; }
+
+.photo-thumb {
+  position: relative;
+  flex: none;
+  width: 96px;
+  height: 96px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.photo-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.photo-thumb:active { border-color: var(--accent); }
+
+.photo-thumb.is-missing { display: grid; place-items: center; }
+.photo-missing {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  padding: 0 var(--sp-2);
+  text-align: center;
+}
+
+.photo-add {
+  flex: none;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  width: 96px;
+  height: 96px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.photo-add svg { color: var(--accent); }
+.photo-add:active { background: var(--surface-2); }
+
+/* Capped so a tall photo cannot push the sheet's buttons off the screen. */
+.photo-full {
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}

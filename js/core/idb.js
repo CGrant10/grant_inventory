@@ -186,13 +186,25 @@ export async function outboxCount() {
   return wrap(tx(db, '_outbox', 'readonly').objectStore('_outbox').count());
 }
 
-/* ---- Blobs (offline photos) ---- */
+/* ---- Blobs (offline photos) ----
+ *
+ * This store is two things at once, and deliberately so: the queue of photos
+ * waiting to be uploaded, and the local cache of every photo already seen. A
+ * record stays put after it uploads, which is what stops a phone re-downloading
+ * the same picture on every visit — the free tier's egress is far scarcer than
+ * its disk. `uploaded` is the flag that separates the two roles. */
 
-export async function blobPut(id, blob, entity) {
+export async function blobPut(id, blob, meta = {}) {
   const db = await open();
   const t = tx(db, '_blobs', 'readwrite');
-  t.objectStore('_blobs').put({ id, blob, entity, created_at: new Date().toISOString() });
+  t.objectStore('_blobs').put({ id, blob, ...meta, created_at: new Date().toISOString() });
   await done(t);
+}
+
+/** Everything held locally — the uploader filters this down to what it owes. */
+export async function blobAll() {
+  const db = await open();
+  return wrap(tx(db, '_blobs', 'readonly').objectStore('_blobs').getAll());
 }
 
 export async function blobGet(id) {

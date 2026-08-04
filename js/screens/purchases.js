@@ -6,6 +6,7 @@
 import { el, icon, ICONS, empty } from '../ui/dom.js';
 import { purchaseRepo, warrantyState, warrantyLabel, fmtMoney, fmtMoneyShort } from '../data/purchases.js';
 import { purchaseForm } from '../ui/purchase-form.js';
+import { photoStrip } from '../ui/photo.js';
 import { spendTotal, monthStart, yearStart } from '../features/analytics.js';
 import { sheet, close, confirmSheet } from '../ui/sheet.js';
 import { toast } from '../ui/toast.js';
@@ -125,6 +126,13 @@ function details(purchase) {
         el('span', { class: 'kv-value selectable', text: value }),
       ]))),
       purchase.notes ? el('p', { class: 'help selectable', text: purchase.notes }) : null,
+
+      // The receipt itself. Rebuilding the sheet after a change is the cheapest
+      // way to keep the strip honest without teaching it to re-render in place.
+      photoStrip('purchase', purchase.id, {
+        title: 'Receipt',
+        onChange: () => { refresh(); details(purchase); },
+      }),
       purchase.item_id
         ? el('a', { class: 'btn btn-block', href: `#/item/${purchase.item_id}`, text: 'Open the item', onclick: () => close() })
         : null,

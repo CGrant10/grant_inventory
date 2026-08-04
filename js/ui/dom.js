@@ -46,6 +46,7 @@ export const ICONS = {
   clock:   '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   search:  '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+  camera:  '<path d="M3 8h4l1.5-2h7L17 8h4v12H3z"/><circle cx="12" cy="13.5" r="3.5"/>',
   chart:   '<path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 17v-5M13 17V8M18 17v-7"/>',
 };
 
