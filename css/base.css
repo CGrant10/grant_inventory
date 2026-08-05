@@ -151,6 +151,20 @@ a { color: inherit; text-decoration: none; }
 .tab[aria-current="page"] { color: var(--accent); }
 .tab:active { color: var(--text-2); }
 
+/* A small lift as a tab becomes the current one. It plays when the attribute
+   first appears, which — because the tap sets it rather than the finished
+   render — is the moment the finger lands, not the moment the data arrives.
+   Not on the scan button: it is already a raised circle with its own press
+   transform, and a second one on top reads as a wobble. */
+.tab:not(.tab-scan)[aria-current="page"] svg {
+  animation: tab-pop 260ms var(--ease);
+}
+@keyframes tab-pop {
+  0%   { transform: none; }
+  45%  { transform: translateY(-2px) scale(1.14); }
+  100% { transform: none; }
+}
+
 /* Center scan button sits proud of the bar. */
 .tab-scan {
   align-self: center;

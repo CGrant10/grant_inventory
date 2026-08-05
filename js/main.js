@@ -86,9 +86,21 @@ function onRouteChange({ path }) {
   const isTab = TABS.includes(base.slice(1));
   backBtn.hidden = isTab;
 
+  markTab(base.slice(1));
+}
+
+/**
+ * Move the highlight to a tab.
+ *
+ * Called twice for every tab tap, on purpose. The route change is the source of
+ * truth, but it only arrives once the screen's data has been read and the view
+ * built — and until then the bar still points at the tab you just left, which is
+ * the whole of why tapping one felt dead. The tap moves it immediately; the
+ * route change confirms it, or puts it back if the navigation went elsewhere.
+ */
+function markTab(name) {
   for (const tab of document.querySelectorAll('.tab')) {
-    const active = tab.dataset.tab === base.slice(1);
-    if (active) tab.setAttribute('aria-current', 'page');
+    if (tab.dataset.tab === name) tab.setAttribute('aria-current', 'page');
     else tab.removeAttribute('aria-current');
   }
 }
@@ -204,7 +216,19 @@ async function startApp() {
 
   await idb.open();
   defineRoutes();
-  await router.start(view, onRouteChange);
+
+  // Tap feedback that does not wait for the screen to be built. A finger that
+  // came down on the bar only to scroll the page never navigates, and the
+  // browser says so by cancelling the pointer — put the highlight back.
+  for (const tab of document.querySelectorAll('.tab')) {
+    tab.addEventListener('pointerdown', () => markTab(tab.dataset.tab));
+    tab.addEventListener('pointercancel', () => {
+      const path = router.currentRoute()?.path ?? '/home';
+      markTab(path.split('/')[1]);
+    });
+  }
+
+  await router.start(view, onRouteChange, { lanes: TABS.map(t => `/${t}`) });
 
   backBtn.onclick = () => router.back();
   document.getElementById('settings-btn').onclick = () => router.go('/settings');

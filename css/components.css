@@ -335,14 +335,33 @@
 
 /* ---- Screen entry ---- */
 
-/* A short rise on the incoming screen. Short on purpose: this plays on every
-   navigation, and anything longer than about 200ms stops reading as responsive
-   and starts reading as a wait. */
-.view.is-entering {
-  animation: view-in 190ms var(--ease) both;
+/* Short on purpose: this plays on every navigation, and anything longer than
+   about 200ms stops reading as responsive and starts reading as a wait.
+
+   The direction is set by the router — a rise for a step inward, a slide for a
+   move between two tabs. Only opacity and transform are animated, so none of
+   this costs a layout no matter how long the list underneath is. */
+.view[data-enter] {
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease);
+  animation-fill-mode: both;
 }
+.view[data-enter="up"]    { animation-name: view-in; }
+.view[data-enter="right"] { animation-name: view-in-right; }
+.view[data-enter="left"]  { animation-name: view-in-left; }
+
 @keyframes view-in {
   from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+/* Further than the rise travels: sideways is the whole point of the gesture, and
+   8px of it does not read as movement at all. */
+@keyframes view-in-right {
+  from { opacity: 0; transform: translateX(22px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes view-in-left {
+  from { opacity: 0; transform: translateX(-22px); }
   to   { opacity: 1; transform: none; }
 }
 

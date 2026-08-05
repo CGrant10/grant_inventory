@@ -8,6 +8,12 @@ let outlet = null;
 let onChange = null;
 let current = null;
 
+// The tab bar's screens, in the order they sit along the bottom of the phone.
+// The router does not otherwise know tabs exist; it only needs the order, so
+// that moving between two of them can be animated the way the eye expects.
+let lanes = [];
+let lastPath = null;
+
 export function define(pattern, load, meta = {}) {
   const names = [];
   const rx = new RegExp('^' + pattern
@@ -163,11 +169,12 @@ async function render({ navigated = true, restoreTo = 0 } = {}) {
     outlet.scrollTop = 0;
     window.scrollTo(0, 0);
     restoreScroll(restoreTo);
-    animateIn(outlet);
+    animateIn(outlet, enterDirection(lastPath, p));
   } else {
     restoreScroll(scrollY);
   }
 
+  lastPath = p;
   onChange?.(current);
 }
 
@@ -196,17 +203,38 @@ function restoreScroll(y) {
 }
 
 /**
- * A brief rise-and-fade on the incoming screen.
+ * A brief animation on the incoming screen.
  *
  * Deliberately one animation on the container rather than a stagger down the
  * rows: a stagger is charming once and tiresome by the fourth tab tap, and it
  * delays the thing the person came to read.
+ *
+ * Which way it moves says what kind of move it was. Going deeper — a place, an
+ * item — rises, because that is a step inward. Moving between two tabs slides,
+ * in the direction the tabs themselves are laid out: Shop is to the right of
+ * Home, so it arrives from the right. A lateral move that animates like a step
+ * inward is the thing that reads as clunky; the eye expects the screen to travel
+ * the same way the finger did.
  */
-function animateIn(node) {
+function animateIn(node, direction) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  node.classList.remove('is-entering');
+  node.removeAttribute('data-enter');
   void node.offsetWidth;                      // restart the animation on re-entry
-  node.classList.add('is-entering');
+  node.dataset.enter = direction;
+}
+
+/** Which tab a path belongs to, if any: '/item/3' and '/inventory' are both Items. */
+function laneOf(path) {
+  return path ? '/' + path.split('/')[1] : null;
+}
+
+function enterDirection(from, to) {
+  const a = lanes.indexOf(laneOf(from));
+  const b = lanes.indexOf(laneOf(to));
+  // Anything that is not one tab to another — the first paint, a drill-down, a
+  // screen with no tab of its own — is a step inward.
+  if (a === -1 || b === -1 || a === b) return 'up';
+  return b > a ? 'right' : 'left';
 }
 
 /** Shaped like a list, because that is what most screens turn out to be. */
@@ -231,9 +259,13 @@ function errorView(err) {
   return el;
 }
 
-export function start(outletEl, changeHandler) {
+/**
+ * @param {string[]=} opts.lanes  tab routes, left to right, for slide direction.
+ */
+export function start(outletEl, changeHandler, { lanes: laneList = [] } = {}) {
   outlet = outletEl;
   onChange = changeHandler;
+  lanes = laneList;
   window.addEventListener('hashchange', onHashChange);
   if (!location.hash) location.replace('#/home');
 

@@ -135,6 +135,25 @@ The inventory list stacks either A–Z or **by place** — the toggle at the end
 the filter chips. That is a reading preference rather than somewhere you
 navigated to, so it lives in `localStorage` and not in the URL.
 
+## Moving between screens
+
+The direction a screen arrives from says what kind of move it was. A step inward
+— a place, an item, Settings — rises. Moving between two tabs slides, the way the
+tabs are laid out along the bottom: Shop is three to the right of Home, so it
+comes in from the right. `js/core/router.js` is told the tab order by `main.js`
+and knows nothing else about tabs.
+
+The highlight in the bar moves on `pointerdown`, not when the new screen has
+finished rendering. Waiting for the render is most of why tapping a tab felt
+dead: nothing at all acknowledged the tap until the data had been read. The
+route change still sets it afterwards, so a navigation that ends up somewhere
+else corrects itself, and a finger that came down on the bar only to scroll gets
+the highlight put back on `pointercancel`.
+
+Only `opacity` and `transform` are animated, so none of it costs a layout no
+matter how long the list underneath is, and `prefers-reduced-motion` skips the
+whole thing — the attribute the animation keys off is never set.
+
 ## Going back, and getting out
 
 Every history entry is stamped with a number in `history.state`, and the scroll
