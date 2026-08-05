@@ -5,6 +5,7 @@ import { el, icon, ICONS, empty } from '../ui/dom.js';
 import { locationRepo } from '../data/locations.js';
 import { placeForm, movePicker } from '../ui/place-form.js';
 import { itemForm } from '../ui/item-form.js';
+import { bulkAddForm } from '../ui/bulk-add.js';
 import { qrElement } from '../ui/qr.js';
 import { photoStrip } from '../ui/photo.js';
 import { sheet, close, confirmSheet } from '../ui/sheet.js';
@@ -66,6 +67,13 @@ export default async function location({ slug }) {
       class: 'btn btn-primary btn-block',
       onclick: () => itemForm({ locationId: place.id, onDone: () => refresh() }),
     }, [icon(ICONS.plus, 20), el('span', { text: 'Add an item here' })]),
+
+    // Emptying a tote onto the floor and reading it out is one list, not thirty
+    // trips through the form above.
+    el('button', {
+      class: 'btn btn-block',
+      onclick: () => bulkAddForm({ locationId: place.id, onDone: () => refresh() }),
+    }, [icon(ICONS.plus, 20), el('span', { text: 'Add several at once' })]),
 
     el('div', { class: 'section-title', text: 'Places inside' }),
     children.length

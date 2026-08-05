@@ -2,7 +2,7 @@
 //
 // VERSION must match version.txt and the cache string in sw.js. All three move
 // together on every commit or the in-app update check breaks.
-export const VERSION = '0.21.1';
+export const VERSION = '0.22.0';
 
 // Supabase project. The publishable key is public — it ships in every client
 // bundle and the repo is public, so treat it as readable by anyone. What that

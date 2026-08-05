@@ -117,6 +117,24 @@ URL anything can call), **receipts and warranties**, **insights** — spending b
 month and by shop, what gets used most, and what is on course to run out — and
 **photos** on items, places, measurements, projects and receipts.
 
+## Filling the house
+
+The first pass through a house is a different job from adding the thing you just
+bought, so it has its own two shapes:
+
+- **Save & another** on the new-item sheet keeps the sheet open and keeps the
+  place, unit and category, clearing only the name. Enter does the same, so a
+  tote is typed rather than tapped through.
+- **Add several at once** — on a place, or at the foot of the inventory — takes
+  a list, one item per line, `Name, qty, unit`. Commas and tabs both separate,
+  so a dictated list and a pasted spreadsheet column both work. Nothing is
+  created until every line parses: a half-imported tote is worse than a rejected
+  one, because the only way to audit it is to read it back by hand.
+
+The inventory list stacks either A–Z or **by place** — the toggle at the end of
+the filter chips. That is a reading preference rather than somewhere you
+navigated to, so it lives in `localStorage` and not in the URL.
+
 ## Photos
 
 Every photo is shrunk to fit inside 1600px and re-encoded as JPEG before it is

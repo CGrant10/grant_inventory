@@ -67,7 +67,26 @@ export async function itemForm({ item = null, locationId = null, prefill = null,
     },
   });
 
-  const save = async () => {
+  // "Added 3 · Coffee, Beans, Rice" — the receipt for a run of quick adds, so
+  // the sheet staying open still feels like something happened each time.
+  const added = [];
+  const tally = el('div', { class: 'form-tally', hidden: true });
+
+  const showTally = () => {
+    tally.hidden = !added.length;
+    const shown = added.slice(-3).reverse().join(', ');
+    tally.textContent = `Added ${added.length} · ${shown}${added.length > 3 ? '…' : ''}`;
+  };
+
+  /**
+   * @param {boolean} again  keep the sheet open for the next one.
+   *
+   * Filling a bin is twenty items in the same place, and closing the sheet after
+   * each one makes that twenty round trips through the list behind it. Staying
+   * open keeps the place, the unit and the category — the parts that do not
+   * change — and clears only the name.
+   */
+  const save = async (again = false) => {
     const trimmed = name.value.trim();
     if (!trimmed) return errorToast('Give the item a name.');
 
@@ -90,15 +109,29 @@ export async function itemForm({ item = null, locationId = null, prefill = null,
             product_id: prefill?.product_id ?? null,
             quantity: qty.value === '' ? 0 : Number(qty.value),
           });
-      close();
-      toast(editing ? 'Saved' : `Added ${trimmed}`);
+
+      if (again) {
+        added.push(trimmed);
+        showTally();
+        name.value = '';
+        qty.value = '1';
+        // The barcode belongs to the item that was just saved, not to the next
+        // one typed by hand.
+        prefill = null;
+        name.focus({ preventScroll: true });
+      } else {
+        close();
+        toast(editing ? 'Saved' : `Added ${trimmed}`);
+      }
       onDone?.(saved);
     } catch (err) {
       errorToast(err.message);
     }
   };
 
-  name.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+  // Enter is the fast path, so it does whatever the run is doing: on a new item
+  // it saves and stays, because nobody types one name and reaches for the mouse.
+  name.addEventListener('keydown', e => { if (e.key === 'Enter') save(!editing); });
 
   sheet({
     title: editing ? 'Edit item' : 'New item',
@@ -113,10 +146,20 @@ export async function itemForm({ item = null, locationId = null, prefill = null,
       place,
       moreToggle,
       more,
+      tally,
     ]),
     actions: [
-      el('button', { class: 'btn btn-block', text: 'Cancel', onclick: () => close() }),
-      el('button', { class: 'btn btn-primary btn-block', text: editing ? 'Save' : 'Add item', onclick: save }),
+      editing
+        ? el('button', { class: 'btn btn-block', text: 'Cancel', onclick: () => close() })
+        : el('div', { class: 'btn-pair' }, [
+            el('button', { class: 'btn', text: 'Cancel', onclick: () => close() }),
+            el('button', { class: 'btn', text: 'Save & another', onclick: () => save(true) }),
+          ]),
+      el('button', {
+        class: 'btn btn-primary btn-block',
+        text: editing ? 'Save' : 'Add item',
+        onclick: () => save(false),
+      }),
     ],
   });
 }

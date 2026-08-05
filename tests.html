@@ -45,6 +45,7 @@ import { warrantyEnd, warrantyState } from './js/data/purchases.js';
 import { shrink, storagePath } from './js/features/photos.js';
 import { resolve } from './js/core/theme.js';
 import { groupByShape } from './js/core/sync.js';
+import { parseBulkLines } from './js/ui/bulk-add.js';
 import {
   usageStats, memberActivity, spendTotal, spendByMonth, spendByVendor,
   monthsBack, yearStart,
@@ -699,6 +700,57 @@ group('Sync — batching by shape');
   // A null still counts as a column present, which is what PostgREST cares about.
   check('an explicit null is not a missing column',
         shapes([{ id: 'a', notes: null }, { id: 'b', notes: 'hi' }]), [['a', 'b']]);
+}
+
+/* --------------------------------------------------------------- Bulk add
+   A list typed on a phone is messy: stray commas, dictation capitalising things,
+   a heading in the middle. What must never happen is a line landing as an item
+   that is not the item the person meant. */
+
+group('Bulk add parsing');
+{
+  const rows = text => parseBulkLines(text).rows;
+  const errs = text => parseBulkLines(text).errors.map(e => e.line);
+
+  check('a bare name is one of the thing',
+        rows('Duct tape'), [{ name: 'Duct tape', quantity: 1, unit: 'ea' }]);
+  check('name and quantity',
+        rows('Black beans, 4'), [{ name: 'Black beans', quantity: 4, unit: 'ea' }]);
+  check('name, quantity and unit',
+        rows('Paper towels, 6, roll'), [{ name: 'Paper towels', quantity: 6, unit: 'roll' }]);
+
+  // The order people actually type in varies, and a unit alone is common.
+  check('a unit without a quantity still means one',
+        rows('Milk, gal'), [{ name: 'Milk', quantity: 1, unit: 'gal' }]);
+  check('units are matched case-insensitively but stored canonically',
+        rows('Water, 2, L\nSoda, 2, l').map(r => r.unit), ['L', 'L']);
+
+  check('tabs separate too, so a pasted column works',
+        rows('Screws\t50\tea'), [{ name: 'Screws', quantity: 50, unit: 'ea' }]);
+
+  // Zero is a real answer — "we are out of this, but I want to track it".
+  check('zero is allowed', rows('Coffee, 0')[0].quantity, 0);
+  check('fractions survive', rows('Flour, 2.5, lb')[0].quantity, 2.5);
+
+  check('blank lines and headings are skipped, not rejected',
+        rows('# Pantry\n\nRice\n\n# Garage\nRope').map(r => r.name), ['Rice', 'Rope']);
+
+  check('trailing commas do not invent an empty column',
+        rows('Rope, 2,'), [{ name: 'Rope', quantity: 2, unit: 'ea' }]);
+
+  // The three that must be refused rather than guessed at.
+  check('an unknown unit is refused', errs('Coffee, 2, tins'), [1]);
+  check('a negative quantity is refused', errs('Coffee, -2'), [1]);
+  check('the bad line is the only one reported',
+        errs('Rice\nCoffee, 2, tins\nRope'), [2]);
+
+  // A rejected line must not quietly take its neighbours down with it, because
+  // the sheet shows a count of what is ready alongside what is wrong.
+  check('good lines still parse alongside a bad one',
+        rows('Rice\nCoffee, 2, tins\nRope').map(r => r.name), ['Rice', 'Rope']);
+
+  check('nothing in, nothing out', parseBulkLines(''), { rows: [], errors: [] });
+  check('whitespace only is not an item', parseBulkLines('   \n\t\n').rows, []);
 }
 
 /* ------------------------------------------------------------------ Summary */
