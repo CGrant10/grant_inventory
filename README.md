@@ -135,6 +135,27 @@ The inventory list stacks either A–Z or **by place** — the toggle at the end
 the filter chips. That is a reading preference rather than somewhere you
 navigated to, so it lives in `localStorage` and not in the URL.
 
+## Going back, and getting out
+
+Every history entry is stamped with a number in `history.state`, and the scroll
+position it was left at is kept against that number. Back from an item returns
+to the row you tapped, not to the top of three hundred. The number has to be the
+key rather than the path: two entries for `#/locations` are different places, and
+one of them may well be somewhere you have never scrolled.
+
+Sheets are draggable. A drag starts on the grip — which has always looked like a
+handle and until now was not one — or anywhere in content already scrolled to the
+top; never in a field, or a textarea could not be swiped through. Past 28% of the
+sheet's own height, or on a flick, it dismisses; anything less springs back.
+Velocity is measured over the last movement rather than the whole gesture, so
+dragging a sheet down to read what is underneath and then letting go does not
+count as throwing it away.
+
+While a sheet is up the rest of the app is `inert`: not tabbable, not clickable,
+not read out. Tab cycles inside the panel, and closing puts focus back on
+whatever opened it — or on the view, if that button no longer exists because the
+save rebuilt the screen behind it.
+
 ## Photos
 
 Every photo is shrunk to fit inside 1600px and re-encoded as JPEG before it is

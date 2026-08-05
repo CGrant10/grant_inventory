@@ -42,8 +42,17 @@ export function query() {
 
 export function go(to, { replace = false } = {}) {
   const hash = to.startsWith('#') ? to : `#${to}`;
-  if (replace) location.replace(hash);
-  else location.hash = hash;
+  if (replace) {
+    replacing = true;
+    location.replace(hash);
+    // A replace to the hash we are already on fires no hashchange at all, and
+    // the flag would then be read by whatever navigation came next. Clear it on
+    // the next task — hashchange was queued during location.replace, so a real
+    // one still gets there first.
+    setTimeout(() => { replacing = false; }, 0);
+  } else {
+    location.hash = hash;
+  }
 }
 
 export function back(fallback = '/home') {
@@ -59,6 +68,52 @@ export function currentRoute() {
 // has already started can be dropped instead of painting over it.
 let token = 0;
 
+/* ---- Scroll memory ---- */
+
+/**
+ * Every history entry is stamped with a number, and the scroll position it was
+ * left at is kept against that number.
+ *
+ * Without it, going back from an item to a three-hundred-row list lands at the
+ * top of the list — the one place you already know you were not. The number has
+ * to live in `history.state` rather than in a counter here, because that is the
+ * only thing the browser hands back when someone presses Back: two entries for
+ * the same path are different places, and the path alone cannot tell them apart.
+ */
+const scrollByEntry = new Map();
+let entryIndex = 0;
+let highestIndex = 0;
+let replacing = false;          // set by go(..., { replace: true })
+
+function stamp(index) {
+  entryIndex = index;
+  highestIndex = Math.max(highestIndex, index);
+  history.replaceState({ ...history.state, giEntry: index }, '');
+}
+
+function onHashChange() {
+  // Whatever we are leaving, remember where it was left.
+  scrollByEntry.set(entryIndex, window.scrollY);
+  const leaving = entryIndex;
+
+  const seen = history.state?.giEntry;
+  let restoreTo = 0;
+
+  if (typeof seen === 'number') {
+    // Back or forward to an entry that has been here before.
+    entryIndex = seen;
+    highestIndex = Math.max(highestIndex, seen);
+    restoreTo = scrollByEntry.get(seen) ?? 0;
+  } else {
+    // A new entry. A replacement re-uses the number of the entry it replaced, or
+    // the map fills with indices nothing can ever navigate back to.
+    stamp(replacing ? leaving : highestIndex + 1);
+  }
+
+  replacing = false;
+  return render({ navigated: true, restoreTo });
+}
+
 /** Long enough that a warm navigation never flashes a skeleton at all. */
 const SKELETON_AFTER_MS = 150;
 
@@ -67,8 +122,10 @@ const SKELETON_AFTER_MS = 150;
  *   of the screen already on show. Only a navigation resets the scroll position:
  *   a background sync repainting the list under someone reading it must not
  *   throw them back to the top.
+ * @param {number} restoreTo  where this history entry was left, for a Back that
+ *   is returning to it. Zero — the top — for anywhere being opened fresh.
  */
-async function render({ navigated = true } = {}) {
+async function render({ navigated = true, restoreTo = 0 } = {}) {
   const p = path();
   const hit = match(p) || match('/home');
   if (!hit) return;
@@ -101,8 +158,11 @@ async function render({ navigated = true } = {}) {
   outlet.replaceChildren(view instanceof Node ? view : '');
 
   if (navigated) {
+    // Top first regardless, so a screen with nothing remembered never inherits
+    // the last one's position while the new content is still being laid out.
     outlet.scrollTop = 0;
     window.scrollTo(0, 0);
+    restoreScroll(restoreTo);
     animateIn(outlet);
   } else {
     restoreScroll(scrollY);
@@ -123,7 +183,15 @@ function restoreScroll(y) {
   if (!y) return;
   window.scrollTo(0, y);
   requestAnimationFrame(() => {
-    if (window.scrollY !== y) window.scrollTo(0, y);
+    if (window.scrollY === y) return;
+    window.scrollTo(0, y);
+    // One more frame for a screen whose height arrives late — a list of places
+    // with photo strips is taller on its second layout than its first. Only ever
+    // downward-clamped positions are retried, so someone who has already started
+    // scrolling back up is left alone.
+    requestAnimationFrame(() => {
+      if (window.scrollY < y) window.scrollTo(0, y);
+    });
   });
 }
 
@@ -166,8 +234,15 @@ function errorView(err) {
 export function start(outletEl, changeHandler) {
   outlet = outletEl;
   onChange = changeHandler;
-  window.addEventListener('hashchange', render);
+  window.addEventListener('hashchange', onHashChange);
   if (!location.hash) location.replace('#/home');
+
+  // The entry the app booted on. A reload lands back on a stamped one, and its
+  // number has to be adopted rather than reset, or the entries behind it in the
+  // session's history all collide with the numbers handed out from here.
+  const seen = history.state?.giEntry;
+  stamp(typeof seen === 'number' ? seen : 0);
+
   return render();
 }
 

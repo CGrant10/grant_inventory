@@ -317,6 +317,14 @@
   font-size: var(--fs-xl);
   font-weight: 600;
 }
+/* Once a finger has taken hold of the sheet, the entry animation must not be
+   able to run again — releasing a short drag would otherwise replay the whole
+   slide-up from the bottom of the screen. It stays switched off for the rest of
+   the sheet's life, which is why these rules sit ABOVE the exit ones: same
+   specificity, so the later rule wins and the sheet can still animate out. */
+.sheet.is-dragged { animation: none; }
+.sheet-scrim.is-dragged { animation: none; }
+
 .sheet.is-out  { animation: sheet-down var(--fast) var(--ease) forwards; }
 .sheet-scrim.is-out { animation: fade-out var(--fast) var(--ease) forwards; }
 
